@@ -37,11 +37,11 @@ from skfem.helpers import dot, grad
 #   CONFIGURACIÓN
 # =====================
 DEFAULT_VTK = "Sphere.vtk"
-DEFAULT_MODE = "sigma"              # "sigma" o "poisson"
+DEFAULT_MODE = "poisson"              # "sigma" o "poisson"
 DEFAULT_Z0, DEFAULT_Z1 = -0.4, 0.4  # tapas (modo sigma)
 
 # Para modo Poisson:
-DEFAULT_SOURCES = np.array([[0.3, 0.2, 0.0]], dtype=float)
+DEFAULT_SOURCES = np.array([[0.5, -0.4, 0.1]], dtype=float)
 DEFAULT_CHARGES = np.array([1.0], dtype=float)
 
 
@@ -244,11 +244,12 @@ def solve_sigma_laplace(mesh, mio, z0=-0.4, z1=0.4, debug=False):
         xdir[idx_bot] = 0.0
     idx_dir = np.unique(np.hstack([idx_top, idx_bot])).astype(int)
 
-    V = enforce(A, rhs, D=idx_dir, x=xdir)
+    V = enforce(A, rhs, D=idx_dir, x=xdir)[0]
 
     if debug:
+        V_arr = V.toarray().ravel() if hasattr(V, 'toarray') else np.asarray(V).ravel()
         print("Sistema resuelto. V stats:",
-              f"min={float(np.min(V))}, max={float(np.max(V))}, ||V||2={float(np.linalg.norm(V))}")
+              f"min={float(np.min(V_arr))}, max={float(np.max(V_arr))}, ||V||2={float(np.linalg.norm(V_arr))}")
     return basis, V
 
 
@@ -265,7 +266,8 @@ def plot_surface(mesh, tris, V, sources=None, title=None):
         shade=False,
         cmap=None
     )
-    surf.set_array(V[tris].mean(axis=1))
+    V_arr = V.toarray().ravel() if hasattr(V, 'toarray') else np.asarray(V).ravel()
+    surf.set_array(V_arr[tris].mean(axis=1))
     surf.autoscale()
     if sources is not None:
         S = np.asarray(sources, dtype=float)
@@ -287,12 +289,22 @@ if __name__ == "__main__":
     mesh, mio = load_mesh_skfem(vtk_path)
     tris = extract_surface_tris(mio, mesh)
     print(f"Malla: {mesh.p.shape[1]} nodos, {mesh.t.shape[1]} tetras")
+    print(f"Mesh bounds: x=[{mesh.p[0].min():.3f}, {mesh.p[0].max():.3f}], y=[{mesh.p[1].min():.3f}, {mesh.p[1].max():.3f}], z=[{mesh.p[2].min():.3f}, {mesh.p[2].max():.3f}]")
 
     if DEFAULT_MODE.lower() == "poisson":
-        basis, V, used = solve_poisson_point(mesh, DEFAULT_SOURCES, DEFAULT_CHARGES)
-        plot_surface(mesh, tris, V, sources=used,
-                     title="Poisson 3D (fuente(s) puntual(es))")
-        print("Fuentes usadas (interior):", used)
+        try:
+            basis, V, used = solve_poisson_point(mesh, DEFAULT_SOURCES, DEFAULT_CHARGES)
+            plot_surface(mesh, tris, V, sources=used,
+                         title="Poisson 3D (fuente(s) puntual(es))")
+            print("Fuentes usadas (interior):", used)
+        except ValueError as e:
+            print(f"Error en Poisson: {e}")
+            print("Cambiando a modo sigma...")
+            basis, V = solve_sigma_laplace(mesh, mio, z0=DEFAULT_Z0, z1=DEFAULT_Z1, debug=True)
+            plot_surface(
+                mesh, tris, V, sources=None,
+                title=f"∇·(−σ∇V)=0 (z<{DEFAULT_Z0} ⇒ V=0, z>{DEFAULT_Z1} ⇒ V=1)"
+            )
     else:
         basis, V = solve_sigma_laplace(mesh, mio, z0=DEFAULT_Z0, z1=DEFAULT_Z1, debug=True)
         plot_surface(
