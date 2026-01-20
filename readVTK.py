@@ -1,6 +1,3 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-
 """
 readVTK.py — AUTO-RUN con valores por defecto (sin argumentos)
 Muestra el modelo y la solución ya aplicada con Matplotlib.
@@ -33,11 +30,10 @@ from skfem.assembly import asm
 from skfem.utils import solve, enforce
 from skfem.helpers import dot, grad
 
-# =====================
-#   CONFIGURACIÓN
-# =====================
+#CONFIGURACIÓN
+
 DEFAULT_VTK = "Sphere.vtk"
-DEFAULT_MODE = "poisson"              # "sigma" o "poisson"
+DEFAULT_MODE = "poisson"            
 DEFAULT_Z0, DEFAULT_Z1 = -0.4, 0.4  # tapas (modo sigma)
 
 # Para modo Poisson:
@@ -45,7 +41,7 @@ DEFAULT_SOURCES = np.array([[0.5, -0.4, 0.1]], dtype=float)
 DEFAULT_CHARGES = np.array([1.0], dtype=float)
 
 
-# ---------- Carga de malla ----------
+# Carga de malla 
 def load_mesh_skfem(vtk_path: str):
     mio = meshio.read(vtk_path)
     P = np.asarray(mio.points, dtype=float).T
@@ -55,7 +51,7 @@ def load_mesh_skfem(vtk_path: str):
         t10 = np.asarray(mio.cells_dict["tetra10"], dtype=int)
         T = t10[:, [0, 1, 2, 3]].T
     else:
-        raise RuntimeError("El VTK no contiene celdas tetra (tetra o tetra10).")
+        raise RuntimeError("El VTK no contiene celdas.")
     try:
         from skfem import MeshTet
         try:
@@ -84,7 +80,7 @@ def extract_surface_tris(mio, mesh):
     return faces[mask]
 
 
-# ---------- Modo Poisson (fuentes puntuales) ----------
+# Modo Poisson (fuentes puntuales) 
 def _is_inside(mesh, x):
     try:
         _ = mesh.element_finder()(x[0], x[1], x[2], _search_all=True)
@@ -116,16 +112,21 @@ def solve_poisson_point(mesh, sources, charges):
     A = asm(laplace, basis)
     b = np.zeros(basis.N)
     used = []
+    c = mesh.p.mean(axis=1)  # centroid
     for s, q in zip(np.asarray(sources, float), np.asarray(charges, float)):
         s_in = _project_inside(mesh, s)
+        if not _is_inside(mesh, s_in):
+            s_in = c  # use centroid if projection fails
         b += q * basis.point_source(s_in)
         used.append(s_in)
     D = basis.get_dofs()
-    V = solve(*basis.dirichlet(A, b, D=D))
+    # Use enforce for Dirichlet boundary conditions
+    xdir = np.zeros(basis.N)
+    V = enforce(A, b, D=D, x=xdir)[0]
     return basis, V, np.vstack(used)
 
 
-# ---------- Modo σ-Laplace ----------
+# Modo σ-Laplace 
 def _sigma_from_vtk(mio, n_elems):
     sigma = np.ones(n_elems)
     try:
@@ -278,12 +279,10 @@ def plot_surface(mesh, tris, V, sources=None, title=None):
     ax.view_init(elev=25, azim=35)
     plt.colorbar(surf, ax=ax, shrink=0.6, label="V")
     plt.tight_layout()
-    plt.show()
+    return fig
 
 
-# =====================
-#   AUTO-RUN SIN ARGUMENTOS
-# =====================
+# AUTO-RUN 
 if __name__ == "__main__":
     vtk_path = DEFAULT_VTK
     mesh, mio = load_mesh_skfem(vtk_path)
