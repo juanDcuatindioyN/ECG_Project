@@ -1,0 +1,20 @@
+# Proyecto ECG - Solucionador de Malla VTK con Poisson
+# Dependencias requeridas
+
+# Cálculos numéricos
+numpy>=1.19.0
+
+# Visualización
+matplotlib>=3.3.0
+
+# Elementos finitos
+scikit-fem>=3.0.0
+
+# Lectura de archivos VTK
+meshio>=4.0.0
+
+# Interfaz gráfica (incluida en Python estándar)
+# tkinter - incluido en Python
+
+# Dependencias opcionales (descomenta para instalar)
+# tkinterdnd2>=0.3.0  # Para drag & drop
