@@ -73,17 +73,17 @@ ECG_Project/
 
 ### 1. Cargar Archivo VTK
 - **Drag & Drop**: Arrastra `data/Sphere.vtk` a la zona de drop
-- **Botón**: Haz clic en "📁 Seleccionar archivo VTK"
+- **Botón**: Haz clic en " Seleccionar archivo VTK"
 
 ### 2. Configurar Parámetros
 - **Fuentes**: `0.5,-0.4,0.1` (simple) o `0.5,-0.4,0.1;-0.2,0.3,0.0` (múltiples)
 - **Cargas**: `1.0` (simple) o `1.0,-0.5` (múltiples)
 
 ### 3. Visualizar y Resolver
-- **👁️ Vista Previa**: Ver geometría de la malla
-- **⚡ Resolver Poisson**: Calcular y mostrar solución
+- ** Vista Previa**: Ver geometría de la malla
+- ** Resolver Poisson**: Calcular y mostrar solución
 
-## 📊 Ejemplos de Configuración
+##  Ejemplos de Configuración
 
 | Configuración | Fuentes | Cargas | Descripción |
 |---------------|---------|--------|-------------|
@@ -91,7 +91,7 @@ ECG_Project/
 | **Dipolo** | `0.3,0,0.1;-0.3,0,-0.1` | `1.0,-1.0` | Dos fuentes opuestas |
 | **ECG** | `0.2,-0.3,0.1;-0.1,0.4,0.0;0.3,0.1,-0.2` | `1.0,0.8,-0.6` | Configuración realista |
 
-## 🧪 Pruebas y Verificación
+##  Pruebas y Verificación
 
 ```bash
 # Ejecutar todas las pruebas
@@ -105,7 +105,7 @@ python tests/test_gui.py       # Pruebas de interfaz
 python tests/run_all_tests.py
 ```
 
-## 📦 Dependencias
+##  Dependencias
 
 ### Requeridas
 - `numpy` - Cálculos numéricos
@@ -135,7 +135,7 @@ python main.py
 python main.py --test
 ```
 
-## 🎯 Comandos Disponibles
+##  Comandos Disponibles
 
 | Comando | Descripción |
 |---------|-------------|
@@ -145,7 +145,7 @@ python main.py --test
 | `python main.py --info` | Mostrar información del proyecto |
 | `python main.py --help` | Mostrar ayuda |
 
-## 🏗️ Arquitectura Técnica
+##  Arquitectura Técnica
 
 ### Módulos Principales
 
@@ -160,7 +160,7 @@ python main.py --test
 3. **Resolución**: Ecuación de Poisson con elementos finitos
 4. **Visualización**: Superficie 3D con colores por potencial
 
-## 🤝 Contribución
+##  Contribución
 
 El proyecto está organizado de manera modular para facilitar contribuciones:
 
@@ -169,11 +169,11 @@ El proyecto está organizado de manera modular para facilitar contribuciones:
 - **Ejemplos**: Agregar en `examples/`
 - **Documentación**: Actualizar en `docs/`
 
-## 📄 Licencia
+##  Licencia
 
 Este proyecto está disponible bajo los términos especificados por el autor.
 
-## 🎉 Estado del Proyecto
+##  Estado del Proyecto
 
 ✅ **Completamente funcional** - Todas las pruebas pasan  
 ✅ **Interfaz moderna** - Drag & drop y visualización integrada  

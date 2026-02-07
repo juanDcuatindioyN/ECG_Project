@@ -61,10 +61,10 @@ def format_mesh_info(mesh, file_path: str) -> str:
         str: Información formateada
     """
     info_lines = [
-        f"📄 {os.path.basename(file_path)}",
-        f"📊 Nodos: {mesh.p.shape[1]:,}",
-        f"🔺 Elementos: {mesh.t.shape[1]:,}",
-        "📏 Límites:",
+        f" {os.path.basename(file_path)}",
+        f" Nodos: {mesh.p.shape[1]:,}",
+        f" Elementos: {mesh.t.shape[1]:,}",
+        " Límites:",
         f"   X: [{mesh.p[0].min():.3f}, {mesh.p[0].max():.3f}]",
         f"   Y: [{mesh.p[1].min():.3f}, {mesh.p[1].max():.3f}]",
         f"   Z: [{mesh.p[2].min():.3f}, {mesh.p[2].max():.3f}]"

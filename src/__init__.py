@@ -2,9 +2,6 @@
 Proyecto ECG - Solucionador de Malla VTK con Poisson
 ====================================================
 
-Un solucionador interactivo para ecuaciones de Poisson en mallas VTK
-con interfaz gráfica moderna y visualización 3D integrada.
-
 Módulos:
     gui: Interfaz gráfica de usuario
     core: Funciones principales de procesamiento VTK y Poisson

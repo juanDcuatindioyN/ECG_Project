@@ -191,11 +191,24 @@ class ECGAppAuto:
     - Análisis de complejidad de malla
     """
     
-    def __init__(self, root):
-        # Usar TkinterDnD solo si está disponible
-        if HAS_DND and not hasattr(root, '_tk'):
-            self.root = TkinterDnD.Tk()
+    def __init__(self, root=None):
+        # Importar tkinter al inicio
+        import tkinter as tk
+        
+        # Crear ventana principal si no se proporciona una
+        if root is None:
+            # Intentar usar TkinterDnD si está disponible
+            if HAS_DND:
+                try:
+                    self.root = TkinterDnD.Tk()
+                except Exception:
+                    self.root = tk.Tk()
+                    print("Nota: Error inicializando TkinterDnD, usando Tkinter estándar")
+            else:
+                self.root = tk.Tk()
+                print("Nota: Drag & Drop no disponible. Instala tkinterdnd2 para esta funcionalidad.")
         else:
+            # Usar la ventana proporcionada
             self.root = root
             
         self.root.title("Proyecto ECG - Solucionador Automático de Poisson")
