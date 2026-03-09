@@ -230,7 +230,7 @@ class ECGAppAuto:
         
         # Variables para progreso
         self.progress_var = tk.DoubleVar()
-        self.status_var = tk.StringVar(value="Buscando modelo de torso...")
+        self.status_var = tk.StringVar(value="Generando malla procedural...")
         
         # Queue para comunicación segura entre hilos
         self.task_queue = queue.Queue()
@@ -283,7 +283,7 @@ class ECGAppAuto:
         self.file_info.pack(fill=tk.X, pady=5)
         
         # Botón para cargar archivo opcional (más pequeño y discreto)
-        self.file_button = tk.Button(file_section, text="📁 Cargar archivo de malla (VTK/MSH)", 
+        self.file_button = tk.Button(file_section, text="📁 Cargar otro archivo VTK (opcional)", 
                                    command=self.load_file, font=("Arial", 9),
                                    bg='#95a5a6', fg='white', relief=tk.FLAT, padx=15, pady=5)
         self.file_button.pack(pady=5)
@@ -301,18 +301,16 @@ class ECGAppAuto:
         
         # Información inicial
         self.analysis_info.config(state=tk.NORMAL)
-        self.analysis_info.insert(1.0, """CARGANDO MODELO DE TORSO...
+        self.analysis_info.insert(1.0, """GENERANDO MALLA AUTOMÁTICA...
 
-La aplicación buscará y cargará
-automáticamente el modelo anatómico
-de torso del proyecto scikit-fem.
+La aplicación generará una malla
+esférica proceduralmente y mostrará
+su geometría 3D.
 
-Modelos soportados:
-• Torso con pulmones (completo)
-• Torso sin pulmones (simplificado)
-
-Si no encuentra el modelo, generará
-una esfera como alternativa.""")
+Luego podrás:
+• Generar el mallado con Poisson
+• Cargar un archivo VTK personalizado
+• Ajustar parámetros manualmente""")
         self.analysis_info.config(state=tk.DISABLED)
 
         # Botones de acción
@@ -358,41 +356,15 @@ una esfera como alternativa.""")
     def create_placeholder(self):
         """Crea un placeholder inicial para el área de visualización."""
         placeholder = tk.Label(self.plot_frame, 
-                             text="Buscando modelo de torso...\n\n🔄 Espera un momento",
+                             text="Generando malla procedural...\n\n🔄 Espera un momento",
                              font=("Arial", 14), bg='white', fg='#3498db')
         placeholder.pack(expand=True)
         self.placeholder = placeholder
     
     def load_default_mesh(self):
-        """Carga automáticamente un archivo MSH del proyecto scikit-fem"""
-        # Buscar archivos MSH en ubicaciones comunes
-        possible_paths = [
-            # En la carpeta del proyecto ECG
-            'ecg_torso_v2_con_pulmones.msh',
-            'ecg_torso_v2_sin_pulmones.msh',
-            'data/ecg_torso_v2_con_pulmones.msh',
-            'data/ecg_torso_v2_sin_pulmones.msh',
-            # En la carpeta de scikit-fem descargada
-            r'c:\Users\FRI-01\Downloads\scikit-fem\ProyectoECG\ecg_torso_v2_con_pulmones.msh',
-            r'c:\Users\FRI-01\Downloads\scikit-fem\ProyectoECG\ecg_torso_v2_sin_pulmones.msh',
-            # Rutas relativas desde Downloads
-            '../../../Downloads/scikit-fem/ProyectoECG/ecg_torso_v2_con_pulmones.msh',
-            '../../Downloads/scikit-fem/ProyectoECG/ecg_torso_v2_con_pulmones.msh',
-        ]
-        
-        default_file = None
-        for path in possible_paths:
-            if os.path.exists(path):
-                default_file = path
-                break
-        
-        if default_file:
-            self.status_var.set("Cargando modelo de torso...")
-            self.process_file(default_file, auto_preview=True)
-        else:
-            # Si no encuentra archivos MSH, generar esfera como fallback
-            self.status_var.set("No se encontró modelo de torso - Generando esfera...")
-            self.task_queue.put(('generate_mesh', None))
+        """Genera automáticamente una malla esférica procedural al iniciar"""
+        self.status_var.set("Generando malla procedural...")
+        self.task_queue.put(('generate_mesh', None))
 
     def setup_drag_drop(self):
         """Configura drag & drop para archivos VTK (solo si está disponible)"""
@@ -421,30 +393,19 @@ una esfera como alternativa.""")
         files = self.root.tk.splitlist(event.data)
         if files:
             file_path = files[0]
-            if file_path.lower().endswith(('.vtk', '.msh')):
-                # Limpiar visualización anterior
-                self._clear_plot_area()
-                # Cargar archivo con vista previa automática
-                self.process_file(file_path, auto_preview=True)
+            if file_path.lower().endswith('.vtk'):
+                self.process_file(file_path)
             else:
-                messagebox.showerror("Error", "Por favor selecciona un archivo .vtk o .msh")
+                messagebox.showerror("Error", "Por favor selecciona un archivo .vtk")
 
     def load_file(self):
         """Carga archivo mediante diálogo"""
         file_path = filedialog.askopenfilename(
-            title="Seleccionar archivo de malla",
-            filetypes=[
-                ("Archivos de malla", "*.vtk *.msh"),
-                ("Archivos VTK", "*.vtk"),
-                ("Archivos MSH", "*.msh"),
-                ("Todos los archivos", "*.*")
-            ]
+            title="Seleccionar archivo VTK",
+            filetypes=[("Archivos VTK", "*.vtk"), ("Todos los archivos", "*.*")]
         )
         if file_path:
-            # Limpiar visualización anterior
-            self._clear_plot_area()
-            # Cargar archivo con vista previa automática
-            self.process_file(file_path, auto_preview=True)
+            self.process_file(file_path)
 
     def process_file(self, file_path, auto_preview=False):
         """Procesa el archivo VTK seleccionado de forma segura"""
@@ -811,45 +772,20 @@ ajustar parámetros manualmente."""
                 
                 X = self.mesh.p.T
                 
-                # Verificar que tenemos triángulos válidos
-                if self.tris is None or len(self.tris) == 0:
-                    # Si no hay triángulos, mostrar puntos
-                    ax.scatter(X[:, 0], X[:, 1], X[:, 2], c=X[:, 2], cmap='viridis', s=20)
-                    ax.set_title("Vista Previa de la Malla (Puntos)", fontsize=12, fontweight='bold')
-                else:
-                    # Mostrar superficie con colores por altura
-                    colors = X[:, 2]  # Color por coordenada Z
-                    
-                    # Verificar que los índices de triángulos son válidos
-                    max_idx = np.max(self.tris)
-                    if max_idx >= len(colors):
-                        # Usar colores simples si hay problema con índices
-                        surf = ax.plot_trisurf(X[:, 0], X[:, 1], X[:, 2], 
-                                             triangles=self.tris, alpha=0.8,
-                                             cmap='viridis', linewidth=0.1)
-                    else:
-                        surf = ax.plot_trisurf(X[:, 0], X[:, 1], X[:, 2], 
-                                             triangles=self.tris, alpha=0.8,
-                                             cmap='viridis', linewidth=0.1)
-                        # Calcular colores promedio por triángulo de forma segura
-                        try:
-                            tri_colors = colors[self.tris].mean(axis=1)
-                            surf.set_array(tri_colors)
-                        except:
-                            pass  # Si falla, usar colores por defecto
-                    
-                    ax.set_title("Vista Previa de la Malla", fontsize=12, fontweight='bold')
-                    
-                    try:
-                        fig.colorbar(surf, ax=ax, shrink=0.6, label="Altura (Z)")
-                    except:
-                        pass  # Si falla el colorbar, continuar sin él
+                # Mostrar solo superficie con colores por altura
+                colors = X[:, 2]  # Color por coordenada Z
+                surf = ax.plot_trisurf(X[:, 0], X[:, 1], X[:, 2], 
+                                     triangles=self.tris, alpha=0.8,
+                                     cmap='viridis', linewidth=0.1)
+                surf.set_array(colors[self.tris].mean(axis=1))
                 
+                ax.set_title("Vista Previa de la Malla", fontsize=12, fontweight='bold')
                 ax.set_xlabel("X")
                 ax.set_ylabel("Y") 
                 ax.set_zlabel("Z")
                 ax.view_init(elev=25, azim=45)
                 
+                fig.colorbar(surf, ax=ax, shrink=0.6, label="Altura (Z)")
                 fig.tight_layout()
                 
                 # Enviar figura de vuelta
@@ -859,9 +795,7 @@ ajustar parámetros manualmente."""
                 }))
                 
             except Exception as e:
-                import traceback
-                error_msg = f"Error en vista previa: {e}\n{traceback.format_exc()}"
-                self.task_queue.put(('show_error', error_msg))
+                self.task_queue.put(('show_error', f"Error en vista previa: {e}"))
         
         thread = threading.Thread(target=preview_in_background, daemon=True)
         thread.start()
@@ -903,10 +837,3 @@ ajustar parámetros manualmente."""
                 self.placeholder.destroy()
             except:
                 pass
-        
-        # Crear placeholder de carga
-        loading_label = tk.Label(self.plot_frame, 
-                                text="Cargando archivo...\n\n🔄 Procesando",
-                                font=("Arial", 14), bg='white', fg='#3498db')
-        loading_label.pack(expand=True)
-        self.placeholder = loading_label

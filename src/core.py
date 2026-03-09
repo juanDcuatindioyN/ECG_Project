@@ -6,8 +6,10 @@ Este módulo contiene las funciones principales para:
 - Extracción de superficies de mallas tetraédricas
 - Resolución de ecuaciones de Poisson con fuentes puntuales
 - Visualización 3D de resultados
+- Generación procedural de mallas
 
 Funciones principales:
+    generate_sphere_mesh: Genera una malla esférica proceduralmente
     load_mesh_skfem: Carga mallas VTK usando scikit-fem
     extract_surface_tris: Extrae triángulos de superficie
     solve_poisson_point: Resuelve Poisson con fuentes puntuales
@@ -41,20 +43,52 @@ DEFAULT_SOURCES = np.array([[0.5, -0.4, 0.1]], dtype=float)
 DEFAULT_CHARGES = np.array([1.0], dtype=float)
 
 
-def load_mesh_skfem(vtk_path: str):
+def generate_sphere_mesh(radius=1.0, refinement=2):
     """
-    Carga una malla VTK y la convierte a formato scikit-fem.
+    Genera una malla esférica tetraédrica usando el método nativo de scikit-fem.
     
     Args:
-        vtk_path (str): Ruta al archivo VTK
+        radius (float): Radio de la esfera
+        refinement (int): Nivel de refinamiento (1-3 recomendado)
+        
+    Returns:
+        tuple: (mesh, mio) donde mesh es la malla scikit-fem y mio es el objeto meshio
+    """
+    try:
+        from skfem import MeshTet
+    except:
+        from skfem import MeshTet1 as MeshTet
+    
+    # Usar el método nativo de scikit-fem para generar una esfera
+    mesh = MeshTet.init_ball(nrefs=refinement)
+    
+    # Escalar al radio deseado (init_ball genera con radio 1.0 por defecto)
+    if radius != 1.0:
+        mesh = mesh.scaled(radius)
+    
+    # Crear objeto meshio compatible
+    points = mesh.p.T
+    cells = [("tetra", mesh.t.T)]
+    
+    mio = meshio.Mesh(points, cells)
+    
+    return mesh, mio
+
+
+def load_mesh_skfem(file_path: str):
+    """
+    Carga una malla (VTK o MSH) y la convierte a formato scikit-fem.
+    
+    Args:
+        file_path (str): Ruta al archivo VTK o MSH
         
     Returns:
         tuple: (mesh, mio) donde mesh es la malla scikit-fem y mio es el objeto meshio
         
     Raises:
-        RuntimeError: Si el VTK no contiene celdas tetraédricas
+        RuntimeError: Si el archivo no contiene celdas tetraédricas
     """
-    mio = meshio.read(vtk_path)
+    mio = meshio.read(file_path)
     P = np.asarray(mio.points, dtype=float).T
     
     if "tetra" in mio.cells_dict:
@@ -63,7 +97,7 @@ def load_mesh_skfem(vtk_path: str):
         t10 = np.asarray(mio.cells_dict["tetra10"], dtype=int)
         T = t10[:, [0, 1, 2, 3]].T
     else:
-        raise RuntimeError("El VTK no contiene celdas tetraédricas.")
+        raise RuntimeError(f"El archivo {file_path} no contiene celdas tetraédricas.")
     
     try:
         from skfem import MeshTet

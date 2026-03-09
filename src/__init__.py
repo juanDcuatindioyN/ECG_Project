@@ -13,7 +13,7 @@ __author__ = "Proyecto ECG"
 __description__ = "Solucionador interactivo de Poisson para mallas VTK"
 
 # Importaciones principales
-from .core import load_mesh_skfem, extract_surface_tris, solve_poisson_point, plot_surface
+from .core import load_mesh_skfem, extract_surface_tris, solve_poisson_point, plot_surface, generate_sphere_mesh
 from .gui_safe import ECGAppAuto
 
 __all__ = [
