@@ -4,6 +4,9 @@
 # Cálculos numéricos
 numpy>=1.19.0
 
+# Álgebra lineal dispersa y solvers
+scipy>=1.5.0
+
 # Visualización
 matplotlib>=3.3.0
 
@@ -12,6 +15,9 @@ scikit-fem>=3.0.0
 
 # Lectura de archivos VTK
 meshio>=4.0.0
+
+# Generación de mallas (opcional pero recomendado)
+gmsh>=4.8.0
 
 # Interfaz gráfica (incluida en Python estándar)
 # tkinter - incluido en Python

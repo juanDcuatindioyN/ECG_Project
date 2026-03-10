@@ -1,180 +1,107 @@
-# Proyecto ECG - Solucionador de Malla VTK con Poisson
+# 🫀 Proyecto ECG - Simulador de ECG con FEM
 
-Una aplicación interactiva profesional para resolver ecuaciones de Poisson en mallas VTK con interfaz gráfica moderna y visualización 3D integrada.
+Simulador completo del problema directo del electrocardiograma (ECG) usando el método de elementos finitos (FEM). Interfaz gráfica con generador automático de modelos anatómicos.
 
-## Inicio Rápido
+## 🚀 Inicio Rápido
 
 ```bash
-# Clonar e instalar
-git clone <repository-url>
-cd ECG_Project
+# Instalar dependencias
 pip install -r requirements.txt
 
-# Ejecutar aplicación
+# Iniciar aplicación
 python main.py
-
-# Ejecutar pruebas
-python main.py --test
-
-# Ver demostración
-python main.py --demo
 ```
 
-## Características
-
-### Interfaz Moderna
-- **Drag & Drop**: Arrastra archivos .vtk directamente
-- **Visualización integrada**: Gráficos 3D embebidos
-- **Procesamiento asíncrono**: Sin bloqueo de interfaz
-- **Barras de progreso**: Feedback visual en tiempo real
-
-### Resolución Automática
-- **Ecuaciones de Poisson** con fuentes puntuales
-- **Detección automática** de parámetros óptimos
-- **Múltiples fuentes** configurables
-- **Proyección automática** al interior de mallas
-- **Visualización 3D** con colores por potencial
-
-### Arquitectura Profesional
-- **Código modular** bien organizado
-- **Suite de pruebas** completa
-- **Documentación** detallada
-- **Manejo robusto** de errores
-
-## Estructura del Proyecto
+## 📂 Estructura del Proyecto
 
 ```
 ECG_Project/
-├── src/                    # Código fuente principal
-│   ├── __init__.py        # Módulo principal
-│   ├── core.py            # Funciones de procesamiento VTK/Poisson
-│   ├── gui_safe.py        # Interfaz gráfica automática
-│   └── utils.py           # Utilidades
-├── tests/                  # Suite de pruebas
-│   ├── test_core.py       # Pruebas del módulo core
-│   ├── test_gui.py        # Pruebas de interfaz
-│   └── run_all_tests.py   # Ejecutor de todas las pruebas
-├── examples/               # Ejemplos y demostraciones
-│   └── demo_automatic.py  # Demostración automática
-├── docs/                   # Documentación
-│   ├── AUTOMATIC_FEATURES.md
-│   └── PROJECT_STRUCTURE.md
-├── data/                   # Archivos de datos
-│   └── Sphere.vtk         # Malla de ejemplo
-├── main.py                 # Punto de entrada principal
-└── requirements.txt        # Dependencias
+├── src/                                      # Código fuente
+│   ├── gui/                                  # Componentes de interfaz
+│   ├── utils/                                # Utilidades
+│   ├── visualization/                        # Visualización 3D
+│   ├── interfaz_grafica_legacy.py           # GUI principal
+│   ├── nucleo_poisson.py                    # Núcleo de Poisson
+│   ├── solucionador_ecg.py                  # Solver ECG completo
+│   └── generador_modelos_anatomicos.py      # Generador de modelos
+├── docs/                                     # Documentación
+├── examples/                                 # Ejemplos
+├── tests/                                    # Tests
+├── data/                                     # Archivos de malla
+├── main.py                                   # Punto de entrada
+└── requirements.txt                          # Dependencias
 ```
 
-## Uso de la Aplicación
+## 📂 Formatos Soportados
 
-### 1. Cargar Archivo VTK
-- **Drag & Drop**: Arrastra `data/Sphere.vtk` a la zona de drop
-- **Botón**: Haz clic en "Seleccionar archivo VTK"
+VTK, Gmsh (.msh), STL, OBJ, PLY, OFF y más formatos gracias a **meshio**. Ver [docs/FORMATOS_SOPORTADOS.txt](docs/FORMATOS_SOPORTADOS.txt).
 
-### 2. Resolución Automática
-- La aplicación detecta automáticamente parámetros óptimos
-- Resuelve la ecuación de Poisson inmediatamente
-- Muestra visualización 3D integrada
+## 📁 Estructura del Proyecto
 
-### 3. Opciones Avanzadas
-- **Vista Previa**: Ver geometría de la malla
-- **Resolver Automáticamente**: Usar parámetros detectados
-- **Resolver Manualmente**: Ajustar parámetros si es necesario
-
-## Ejemplos de Configuración
-
-| Configuración | Descripción | Fuentes Detectadas |
-|---------------|-------------|-------------------|
-| **Simple** | Malla básica | 1 fuente central |
-| **Moderada** | Malla estándar | 2 fuentes (dipolo) |
-| **Compleja** | Malla avanzada | 3 fuentes (triangular) |
-| **Muy Compleja** | Malla detallada | 4+ fuentes (tetraédrica) |
-
-## Pruebas y Verificación
-
-```bash
-# Ejecutar todas las pruebas
-python main.py --test
-
-# Pruebas específicas
-python tests/test_core.py      # Pruebas del módulo core
-python tests/test_gui.py       # Pruebas de interfaz
-
-# Verificación completa
-python tests/run_all_tests.py
+```
+ECG_Project/
+├── src/                                      # Código fuente
+│   ├── gui/                                  # Componentes de interfaz
+│   ├── utils/                                # Utilidades
+│   ├── visualization/                        # Visualización 3D
+│   ├── interfaz_grafica_legacy.py           # GUI principal
+│   ├── nucleo_poisson.py                    # Núcleo de Poisson
+│   ├── solucionador_ecg.py                  # Solver ECG completo
+│   └── generador_modelos_anatomicos.py      # Generador de modelos
+├── docs/                                     # Documentación
+├── examples/                                 # Ejemplos
+├── tests/                                    # Tests
+├── data/                                     # Archivos de malla
+├── main.py                                   # Punto de entrada
+└── requirements.txt                          # Dependencias
 ```
 
-## Dependencias
+## 🎯 Características
 
-### Requeridas
-- `numpy` - Cálculos numéricos
-- `matplotlib` - Visualización 3D
-- `scikit-fem` - Elementos finitos
-- `meshio` - Lectura de archivos VTK
+- Interfaz gráfica con Tkinter
+- Soporte multi-formato de mallas
+- Generador automático de modelos anatómicos (torso, corazón, pulmones)
+- Resolución de Poisson con fuentes puntuales
+- Visualización 3D integrada
+- Solver ECG completo con FEM (5 pasos)
+- 12 derivaciones ECG estándar
 
-### Opcionales
-- `tkinterdnd2` - Drag & Drop (se deshabilita automáticamente si no está disponible)
+## 📖 Uso
 
-## Instalación Detallada
-
-### Opción 1: Instalación Básica
+### Interfaz Gráfica
 ```bash
-pip install numpy matplotlib scikit-fem meshio
 python main.py
 ```
 
-### Opción 2: Instalación Completa (con Drag & Drop)
-```bash
-pip install numpy matplotlib scikit-fem meshio tkinterdnd2
-python main.py
+### Generar Modelo Automático
+1. Clic en "🏥 Generar Modelo Automático"
+2. Seleccionar "Con pulmones" o "Sin pulmones"
+3. Clic en "⚙ Generar Malla"
+
+### API Programática
+```python
+from src import SolucionadorECG
+
+solver = SolucionadorECG('data/ecg_torso_v2_con_pulmones.msh')
+resultados = solver.ejecutar_pipeline_completo()
+derivaciones = resultados['ecg_data']['leads']
 ```
 
-### Verificar Instalación
-```bash
-python main.py --test
-```
+## 📚 Documentación
 
-## Comandos Disponibles
+- [QUICK_START.md](docs/QUICK_START.md) - Guía de inicio rápido
+- [ECG_SOLVER_GUIDE.md](docs/ECG_SOLVER_GUIDE.md) - Guía técnica del solver
+- [GENERADOR_AUTOMATICO.md](docs/GENERADOR_AUTOMATICO.md) - Guía del generador
 
-| Comando | Descripción |
-|---------|-------------|
-| `python main.py` | Ejecutar interfaz gráfica |
-| `python main.py --test` | Ejecutar todas las pruebas |
-| `python main.py --demo` | Ver demostración de capacidades |
-| `python main.py --info` | Mostrar información del proyecto |
-| `python main.py --help` | Mostrar ayuda |
+## 📦 Dependencias
 
-## Arquitectura Técnica
-
-### Módulos Principales
-
-- **`src/core.py`**: Funciones de procesamiento VTK y resolución de Poisson
-- **`src/gui_safe.py`**: Interfaz gráfica automática con Tkinter y matplotlib
-- **`src/utils.py`**: Utilidades y funciones auxiliares
-
-### Flujo de Trabajo
-
-1. **Carga**: Archivo VTK → scikit-fem mesh
-2. **Análisis**: Detección automática de parámetros óptimos
-3. **Resolución**: Ecuación de Poisson con elementos finitos
-4. **Visualización**: Superficie 3D con colores por potencial
-
-## Contribución
-
-El proyecto está organizado de manera modular para facilitar contribuciones:
-
-- **Nuevas características**: Agregar en `src/`
-- **Pruebas**: Agregar en `tests/`
-- **Ejemplos**: Agregar en `examples/`
-- **Documentación**: Actualizar en `docs/`
-
-## Estado del Proyecto
-
-**Completamente funcional** - Todas las pruebas pasan  
-**Interfaz moderna** - Resolución automática de Poisson  
-**Código organizado** - Estructura modular profesional  
-**Bien documentado** - Documentación completa y ejemplos  
+- numpy >= 1.19.0
+- scipy >= 1.5.0
+- matplotlib >= 3.3.0
+- scikit-fem >= 3.0.0
+- meshio >= 4.0.0
 
 ---
 
-Para más información detallada, consulta la documentación en `docs/`
+**Versión**: 3.0.0  
+**Estado**: ✅ Funcional

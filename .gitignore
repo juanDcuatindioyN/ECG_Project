@@ -205,3 +205,26 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# Project specific - ECG_Project
+*.npz
+*.npy
+ecg_*.png
+potential_*.png
+mapa_*.png
+!examples/demo_results.png
+
+# Archivos de malla temporales
+data/mi_modelo*.msh
+data/temp*.msh
+data/test*.msh
+data/nuevo*.msh
+
+# Archivos de salida temporales
+*.geo_unrolled
+*.msh~
+
+# OS specific
+.DS_Store
+Thumbs.db
+desktop.ini

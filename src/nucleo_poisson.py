@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 Módulo principal para procesamiento VTK y resolución de Poisson
 
@@ -184,10 +185,12 @@ def solve_poisson_point(mesh, sources, charges):
     return basis, V, np.vstack(used)
 
 
-def plot_surface(mesh, tris, V, sources=None, title=None, figsize=(8, 6)):
+def plot_surface(mesh, tris, V, sources=None, title=None, figsize=(8, 6), mio=None):
     """
-    Crea una figura de matplotlib para la superficie de la malla con la solución V.
-    Optimizada para integración en interfaces gráficas.
+    Crea una figura de matplotlib mostrando el modelo completo con la solución V.
+    
+    Si mio está disponible (modelo generado), muestra el modelo completo con todos
+    los materiales. Si no, usa visualización simple de superficie.
     
     Args:
         mesh: Malla scikit-fem
@@ -196,15 +199,57 @@ def plot_surface(mesh, tris, V, sources=None, title=None, figsize=(8, 6)):
         sources: Coordenadas de fuentes (opcional)
         title: Título del gráfico
         figsize: Tamaño de la figura
+        mio: Objeto meshio con datos de materiales (opcional)
         
     Returns:
         Figure: Figura de matplotlib
     """
+    # Si tenemos mio (modelo generado), usar visualización completa
+    if mio is not None:
+        try:
+            from .visualization.visor_mallas_3d import crear_figura_3d
+            # Detectar si tiene pulmones
+            from .visualization.visor_mallas_3d import extraer_etiquetas_materiales
+            etiquetas = extraer_etiquetas_materiales(mio)
+            incluir_pulmones = False
+            if etiquetas is not None:
+                materiales_unicos = np.unique(etiquetas)
+                # Si tiene materiales 3 o 4 (pulmones), incluirlos
+                incluir_pulmones = (3 in materiales_unicos or 4 in materiales_unicos)
+            
+            fig = crear_figura_3d(mesh, mio, incluir_pulmones=incluir_pulmones)
+            
+            # Agregar fuentes si existen
+            if sources is not None:
+                ax = fig.axes[0]
+                S = np.asarray(sources, dtype=float)
+                if S.size > 0:
+                    ax.scatter(S[:, 0], S[:, 1], S[:, 2], 
+                              s=150, c="red", marker='*', 
+                              label=f"Fuente(s) ({len(S)})", 
+                              edgecolors='darkred', linewidth=1.5,
+                              zorder=1000)
+                    # Actualizar leyenda
+                    handles, labels = ax.get_legend_handles_labels()
+                    ax.legend(handles=handles, loc='upper right', fontsize=9,
+                             framealpha=0.95, edgecolor='gray', fancybox=True)
+            
+            # Actualizar título si se proporciona
+            if title:
+                ax = fig.axes[0]
+                ax.set_title(title, fontsize=12, fontweight='bold', pad=20)
+            
+            return fig
+        except Exception as e:
+            print(f"Error usando visualización completa: {e}")
+            # Continuar con visualización simple
+    
+    # Visualización simple (fallback para archivos VTK sin materiales)
     X = mesh.p.T
     fig = Figure(figsize=figsize, dpi=100)
     ax = fig.add_subplot(111, projection="3d")
     
-    # Crear superficie
+    # Crear superficie sólida con colores según potencial
     surf = ax.plot_trisurf(
         X[:, 0], X[:, 1], X[:, 2],
         triangles=tris,
@@ -231,7 +276,7 @@ def plot_surface(mesh, tris, V, sources=None, title=None, figsize=(8, 6)):
             ax.legend(loc='upper right')
     
     # Configurar ejes y título
-    ax.set_title(title or "Solución de PDE en la superficie", 
+    ax.set_title(title or "Solución Automática de Poisson 3D", 
                 fontsize=12, fontweight='bold', pad=20)
     ax.set_xlabel("X", fontsize=10)
     ax.set_ylabel("Y", fontsize=10)
@@ -245,7 +290,7 @@ def plot_surface(mesh, tris, V, sources=None, title=None, figsize=(8, 6)):
         cbar = fig.colorbar(surf, ax=ax, shrink=0.6, aspect=20, pad=0.1)
         cbar.set_label("Potencial (V)", fontsize=10)
     except:
-        pass  # En caso de error con colorbar
+        pass
     
     # Ajustar layout
     fig.tight_layout()

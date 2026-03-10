@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 """
 Proyecto ECG - Solucionador de Malla VTK con Poisson
 ===================================================
@@ -23,7 +24,8 @@ def run_gui():
         import tkinter as tk
         
         print(f"Iniciando {__description__} v{__version__}")
-        print("Arrastra archivos .vtk o usa el botón para cargar")
+        print("Formatos soportados: VTK, Gmsh (.msh), STL, OBJ, PLY, y más")
+        print("Arrastra archivos o usa el botón para cargar")
         
         # Crear la aplicación directamente sin crear root por separado
         app = ECGApp(None)  # Pasamos None para que la clase cree su propia ventana
@@ -90,6 +92,41 @@ def main():
         return 0
     else:
         return run_gui()
+
+
+def show_info():
+    """Muestra información del proyecto"""
+    print("=" * 60)
+    print(f"{__description__}")
+    print(f"Versión: {__version__}")
+    print("=" * 60)
+    print("\nModos de Operación:")
+    print("  1. Modo Básico (GUI)    - Resolución de Poisson con interfaz gráfica")
+    print("  2. Modo Avanzado (API)  - Simulador completo de ECG con FEM")
+    print("\nComandos:")
+    print("  python main.py           - Ejecutar interfaz gráfica")
+    print("  python main.py --test    - Ejecutar pruebas")
+    print("  python main.py --demo    - Ver demostración")
+    print("  python main.py --info    - Mostrar esta información")
+    print("\nEjemplos de Uso:")
+    print("  Modo Básico:")
+    print("    python main.py")
+    print("    # Arrastra archivos .vtk, .msh, .stl, .obj, etc.")
+    print("    # Soporta múltiples formatos de malla")
+    print("\n  Modo Avanzado:")
+    print("    python examples/demo_ecg_solver.py")
+    print("\n  API Programática:")
+    print("    from src.ecg_solver import ECGSolver")
+    print("    solver = ECGSolver('data/ecg_torso_v2_con_pulmones.msh')")
+    print("    results = solver.run_full_pipeline()")
+    print("\nDocumentación:")
+    print("  docs/QUICK_START.md       - Guía de inicio rápido")
+    print("  docs/ECG_SOLVER_GUIDE.md  - Guía técnica completa")
+    print("  README.md                 - Descripción general")
+    print("\nArchivos de Datos:")
+    print("  data/Sphere.vtk                        - Malla simple (modo básico)")
+    print("  data/ecg_torso_v2_con_pulmones.msh     - Malla ECG completa")
+    print("=" * 60)
 
 
 if __name__ == "__main__":

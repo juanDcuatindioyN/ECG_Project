@@ -1,0 +1,157 @@
+═══════════════════════════════════════════════════════════════
+  FORMATOS DE MALLA SOPORTADOS - ECG_Project v2.0.0
+═══════════════════════════════════════════════════════════════
+
+La aplicación soporta múltiples formatos de malla gracias a la
+librería meshio. Puedes usar cualquiera de estos formatos tanto
+en la interfaz gráfica como en la API programática.
+
+═══════════════════════════════════════════════════════════════
+  FORMATOS PRINCIPALES
+═══════════════════════════════════════════════════════════════
+
+✅ VTK Legacy (.vtk)
+   - Formato clásico de VTK
+   - Ampliamente usado en visualización científica
+   - Ejemplo: data/Sphere.vtk
+
+✅ VTK XML (.vtu)
+   - Formato XML de VTK
+   - Más moderno que VTK Legacy
+   - Soporta compresión
+
+✅ Gmsh (.msh)
+   - Formato de Gmsh (generador de mallas)
+   - Soporta etiquetas de material (Physical Groups)
+   - Recomendado para ECG avanzado
+   - Ejemplo: data/ecg_torso_v2_con_pulmones.msh
+
+✅ STL (.stl)
+   - Stereolithography
+   - Común en impresión 3D
+   - Solo superficies (triángulos)
+
+✅ Wavefront OBJ (.obj)
+   - Formato de geometría 3D
+   - Ampliamente soportado
+   - Solo superficies
+
+✅ PLY (.ply)
+   - Polygon File Format
+   - Usado en escaneo 3D
+   - Soporta colores y propiedades
+
+✅ OFF (.off)
+   - Object File Format
+   - Simple y compacto
+   - Solo geometría
+
+✅ Medit (.mesh)
+   - Formato de Medit
+   - Soporta tetraedros y etiquetas
+
+═══════════════════════════════════════════════════════════════
+  FORMATOS DE ANÁLISIS POR ELEMENTOS FINITOS
+═══════════════════════════════════════════════════════════════
+
+✅ Abaqus (.inp)
+   - Software comercial de FEM
+   - Formato de entrada de Abaqus
+
+✅ Nastran (.nas, .bdf)
+   - Software de análisis estructural
+   - Usado en aeroespacial
+
+✅ Ansys (.e, .exo)
+   - Software comercial de FEM
+   - Formato Exodus II
+
+✅ CGNS (.cgns)
+   - CFD General Notation System
+   - Usado en dinámica de fluidos
+
+✅ MED (.med)
+   - Formato de Salome/Code_Aster
+   - Usado en análisis estructural
+
+✅ XDMF (.xdmf, .xmf)
+   - eXtensible Data Model and Format
+   - Para grandes conjuntos de datos
+
+═══════════════════════════════════════════════════════════════
+  FORMATOS ADICIONALES
+═══════════════════════════════════════════════════════════════
+
+✅ AVS UCD (.avs)
+✅ DOLFIN XML (.xml)
+✅ Fluent (.cas)
+✅ H5M (.h5m)
+✅ MDPA (.mdpa)
+✅ Permas (.dato)
+✅ SVG (.svg)
+✅ Tecplot (.dat, .tec)
+✅ TetGen (.node, .ele)
+✅ UGRID (.ugrid)
+✅ WKT (.wkt)
+
+═══════════════════════════════════════════════════════════════
+  CÓMO USAR
+═══════════════════════════════════════════════════════════════
+
+Interfaz Gráfica:
+  1. Ejecuta: python main.py
+  2. Arrastra cualquier archivo soportado
+  3. O usa el botón "Seleccionar archivo de malla"
+
+API Programática:
+  from src.ecg_solver import ECGSolver
+  
+  # Funciona con cualquier formato
+  solver = ECGSolver('mi_malla.msh')
+  solver = ECGSolver('mi_malla.vtk')
+  solver = ECGSolver('mi_malla.stl')
+  
+  results = solver.run_full_pipeline()
+
+═══════════════════════════════════════════════════════════════
+  RECOMENDACIONES
+═══════════════════════════════════════════════════════════════
+
+Para Modo Básico (GUI - Poisson simple):
+  ✅ Cualquier formato con tetraedros
+  ✅ VTK, STL, OBJ funcionan bien
+  ✅ No requiere etiquetas de material
+
+Para Modo Avanzado (ECG completo):
+  ✅ Gmsh (.msh) - RECOMENDADO
+  ✅ Debe tener etiquetas de material (Physical Groups)
+  ✅ Debe tener tetraedros (elementos 3D)
+  ✅ Debe tener superficie etiquetada (tag=10)
+
+═══════════════════════════════════════════════════════════════
+  CONVERSIÓN DE FORMATOS
+═══════════════════════════════════════════════════════════════
+
+Puedes convertir entre formatos usando meshio:
+
+  python -c "import meshio; m = meshio.read('input.stl'); meshio.write('output.vtk', m)"
+
+O usando la línea de comandos de meshio:
+
+  meshio convert input.stl output.vtk
+
+═══════════════════════════════════════════════════════════════
+  VERIFICAR FORMATO
+═══════════════════════════════════════════════════════════════
+
+Para verificar si un archivo es compatible:
+
+  python -c "import meshio; m = meshio.read('tu_archivo.ext'); print(f'Nodos: {len(m.points)}, Celdas: {m.cells}')"
+
+═══════════════════════════════════════════════════════════════
+
+Para más información sobre formatos específicos:
+  https://github.com/nschloe/meshio
+
+Para generar mallas con Gmsh:
+  https://gmsh.info/
