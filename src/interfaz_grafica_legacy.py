@@ -100,19 +100,30 @@ def auto_detect_sources(mesh, num_sources=3):
         charges = np.array([1.0, 0.8, -0.6])
         
     elif num_sources == 4:
-        # Configuracion tetraedrica
-        radius = min(dimensions) * 0.2
+        # Configuracion distribuida dentro de una region pequena del centro
+        # Usar el centro de la malla como punto de partida
+        # Las fuentes deben estar MUY cerca del centro para asegurar que esten dentro
         
-        # Vertices de un tetraedro regular
-        tetra_vertices = np.array([
-            [1, 1, 1],
-            [1, -1, -1],
-            [-1, 1, -1],
-            [-1, -1, 1]
-        ]) * radius
+        # Radio muy pequeno para mantener fuentes cerca del centro
+        radio = min(dimensions) * 0.05  # 5% de la dimension minima
         
-        sources = center + tetra_vertices
+        # Distribucion tetraedrica compacta alrededor del centro
+        offsets = np.array([
+            [radio, 0, radio * 0.5],           # Fuente 1: adelante-arriba
+            [-radio, 0, -radio * 0.5],         # Fuente 2: atras-abajo
+            [0, radio, 0],                      # Fuente 3: derecha
+            [0, -radio, radio * 0.3]           # Fuente 4: izquierda-arriba
+        ])
+        
+        sources = center + offsets
         charges = np.array([1.0, -0.8, 0.6, -0.4])
+        
+        print(f"\n=== GENERANDO 4 FUENTES ===")
+        print(f"Centro de la malla: ({center[0]:.4f}, {center[1]:.4f}, {center[2]:.4f})")
+        print(f"Radio usado: {radio:.4f} m")
+        for i, (s, c) in enumerate(zip(sources, charges)):
+            print(f"Fuente {i+1}: ({s[0]:.4f}, {s[1]:.4f}, {s[2]:.4f}), carga {c:.2f}")
+        print("=" * 40 + "\n")
         
     else:
         # Para mas fuentes, distribucion aleatoria estratificada
@@ -237,6 +248,10 @@ class ECGAppAuto:
         # Bandera para controlar resolucion automatica
         self.skip_auto_solve = False
         
+        # Bandera para rastrear si el modelo fue generado automáticamente
+        self.is_auto_generated = False
+        self.auto_generated_with_lungs = False
+        
         # Variables para parametros automaticos
         self.auto_sources = None
         self.auto_charges = None
@@ -293,7 +308,7 @@ class ECGAppAuto:
         self.drop_frame.pack_propagate(False)
         
         if HAS_DND:
-            drop_text = "Arrastra aqui­ tu archivo de malla\n(.vtk, .msh, .vtu, .stl, .obj, etc.)"
+            drop_text = "Arrastra aqui tu archivo de malla\n(.vtk, .msh, .vtu, .stl, .obj, etc.)"
         else:
             drop_text = "Haz clic para seleccionar archivo de malla\n(.vtk, .msh, .vtu, .stl, .obj, etc.)"
             
@@ -313,7 +328,7 @@ class ECGAppAuto:
         
         # Boton de modelo automatico
         if HAS_GMSH:
-            auto_model_button = tk.Button(file_section, text="ðŸ¥ Generar Modelo Automatico", 
+            auto_model_button = tk.Button(file_section, text="Generar Modelo Automatico", 
                                         command=self.show_auto_model_dialog, 
                                         font=("Arial", 10, "bold"),
                                         bg='#27ae60', fg='white', relief=tk.FLAT, padx=20)
@@ -342,7 +357,7 @@ class ECGAppAuto:
         
         # Informacion inicial
         self.analysis_info.config(state=tk.NORMAL)
-        self.analysis_info.insert(1.0, """MODO AUTOMoTICO ACTIVADO
+        self.analysis_info.insert(1.0, """MODO AUTOMATICO ACTIVADO
 
 Caracteristicas automaticas:
 • Deteccion inteligente de fuentes optimas
@@ -551,8 +566,19 @@ ecuacion de Poisson con parametros optimos.""")
         """Maneja la resolucion automatica"""
         def solve_in_background():
             try:
+                # Mostrar coordenadas de fuentes antes de resolver
+                print("\n=== ELECTRODOS CONFIGURADOS ===")
+                for i, (source, charge) in enumerate(zip(self.auto_sources, self.auto_charges)):
+                    print(f"Electrodo {i+1}: posición ({source[0]:.4f}, {source[1]:.4f}, {source[2]:.4f}), carga {charge:.2f}")
+                
                 # Resolver con parametros automaticos
                 basis, V, used_sources = solve_poisson_point(self.mesh, self.auto_sources, self.auto_charges)
+                
+                # Mostrar coordenadas de fuentes proyectadas (usadas realmente)
+                print("\n=== ELECTRODOS PROYECTADOS (USADOS) ===")
+                for i, source in enumerate(used_sources):
+                    print(f"Electrodo {i+1}: posición ({source[0]:.4f}, {source[1]:.4f}, {source[2]:.4f})")
+                print("=" * 40 + "\n")
                 
                 # Crear visualización con modelo completo
                 fig = plot_surface(self.mesh, self.tris, V, sources=used_sources, 
@@ -671,16 +697,21 @@ ecuacion de Poisson con parametros optimos.""")
             self.tris = data['tris']
             self.mesh_analysis = data.get('analysis')
             
+            # Resetear banderas de modelo auto-generado si se carga un archivo normal
+            if not self.skip_auto_solve:
+                self.is_auto_generated = False
+                self.auto_generated_with_lungs = False
+            
             self.progress_var.set(100)
             
             # Actualizar informacion del archivo
             self.file_info.config(state=tk.NORMAL)
             self.file_info.delete(1.0, tk.END)
             
-            info_text = f"""ðŸ“„ {os.path.basename(data['file_path'])}
-ðŸ“Š Nodos: {self.mesh.p.shape[1]:,}
-ðŸ”º Elementos: {self.mesh.t.shape[1]:,}
-ðŸ“ Li­mites:
+            info_text = f""" {os.path.basename(data['file_path'])}
+    Nodos: {self.mesh.p.shape[1]:,}
+    Elementos: {self.mesh.t.shape[1]:,}
+    Limites:
    X: [{self.mesh.p[0].min():.3f}, {self.mesh.p[0].max():.3f}]
    Y: [{self.mesh.p[1].min():.3f}, {self.mesh.p[1].max():.3f}]
    Z: [{self.mesh.p[2].min():.3f}, {self.mesh.p[2].max():.3f}]"""
@@ -693,7 +724,7 @@ ecuacion de Poisson con parametros optimos.""")
                 self.analysis_info.config(state=tk.NORMAL)
                 self.analysis_info.delete(1.0, tk.END)
                 
-                analysis_text = f"""ANoLISIS DE MALLA COMPLETADO
+                analysis_text = f"""ANALISIS DE MALLA COMPLETADO
 
 Complejidad: {self.mesh_analysis['complexity'].upper()}
 Fuentes optimas: {self.mesh_analysis['optimal_sources']}
@@ -701,9 +732,9 @@ Dimensiones: {self.mesh_analysis['dimensions'][0]:.3f} o— {self.mesh_analysis[
 Volumen estimado: {self.mesh_analysis['volume_estimate']:.6f}
 
 PARAMETROS AUTOMoTICOS:
-€¢ {len(self.auto_sources)} fuentes detectadas
-€¢ Cargas balanceadas automaticamente
-€¢ Distribucion espacial optimizada
+    {len(self.auto_sources)} fuentes detectadas
+    Cargas balanceadas automaticamente
+    Distribucion espacial optimizada
 
 Listo para resolucion automatica"""
                 
@@ -752,6 +783,11 @@ Listo para resolucion automatica"""
     def preview_mesh(self):
         """Muestra vista previa de la malla"""
         if not self.mesh:
+            return
+        
+        # Si el modelo fue generado automáticamente, mostrar vista interactiva
+        if self.is_auto_generated:
+            self.show_model_in_main_panel(self.auto_generated_with_lungs)
             return
             
         self.status_var.set("Generando vista previa...")
@@ -841,12 +877,123 @@ Listo para resolucion automatica"""
             return np.array([[0.0, 0.0, 0.0]]), np.array([1.0])
 
     def _show_visualization(self, fig):
-        """Muestra visualizacion en la UI"""
+        """Muestra visualizacion en la UI con controles interactivos"""
         self._clear_plot_area()
         
+        from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
+        
+        # Crear canvas
         canvas = FigureCanvasTkAgg(fig, self.plot_frame)
+        
+        # Toolbar para zoom, pan, rotar
+        toolbar_frame = tk.Frame(self.plot_frame, bg='white')
+        toolbar_frame.pack(side=tk.TOP, fill=tk.X)
+        
+        toolbar = NavigationToolbar2Tk(canvas, toolbar_frame)
+        toolbar.update()
+        
+        # Frame de controles adicionales
+        controls_frame = tk.Frame(self.plot_frame, bg='#f0f0f0', relief=tk.RAISED, bd=1)
+        controls_frame.pack(side=tk.TOP, fill=tk.X, padx=5, pady=5)
+        
+        tk.Label(controls_frame, text="🎮 Controles:", 
+                font=("Arial", 9, "bold"), bg='#f0f0f0').pack(side=tk.LEFT, padx=5)
+        
+        # Obtener el axes 3D
+        ax = fig.axes[0] if fig.axes else None
+        
+        if ax is not None:
+            # Botones de vista
+            def set_view(elev, azim):
+                ax.view_init(elev=elev, azim=azim)
+                canvas.draw()
+            
+            tk.Button(controls_frame, text="Vista Frontal", 
+                     command=lambda: set_view(0, 0),
+                     font=("Arial", 8), bg='#3498db', fg='white', 
+                     relief=tk.FLAT, padx=8, pady=3).pack(side=tk.LEFT, padx=2)
+            
+            tk.Button(controls_frame, text="Vista Superior", 
+                     command=lambda: set_view(90, 0),
+                     font=("Arial", 8), bg='#3498db', fg='white', 
+                     relief=tk.FLAT, padx=8, pady=3).pack(side=tk.LEFT, padx=2)
+            
+            tk.Button(controls_frame, text="Vista Lateral", 
+                     command=lambda: set_view(0, 90),
+                     font=("Arial", 8), bg='#3498db', fg='white', 
+                     relief=tk.FLAT, padx=8, pady=3).pack(side=tk.LEFT, padx=2)
+            
+            tk.Button(controls_frame, text="Vista 3D", 
+                     command=lambda: set_view(25, 45),
+                     font=("Arial", 8), bg='#2ecc71', fg='white', 
+                     relief=tk.FLAT, padx=8, pady=3).pack(side=tk.LEFT, padx=2)
+            
+            # Separador
+            tk.Frame(controls_frame, width=2, bg='#bdc3c7').pack(side=tk.LEFT, fill=tk.Y, padx=5)
+            
+            # Controles de zoom
+            tk.Label(controls_frame, text="Zoom:", 
+                    font=("Arial", 8), bg='#f0f0f0').pack(side=tk.LEFT, padx=5)
+            
+            def zoom_in():
+                xlim = ax.get_xlim()
+                ylim = ax.get_ylim()
+                zlim = ax.get_zlim()
+                
+                x_center = (xlim[0] + xlim[1]) / 2
+                y_center = (ylim[0] + ylim[1]) / 2
+                z_center = (zlim[0] + zlim[1]) / 2
+                
+                x_range = (xlim[1] - xlim[0]) * 0.8
+                y_range = (ylim[1] - ylim[0]) * 0.8
+                z_range = (zlim[1] - zlim[0]) * 0.8
+                
+                ax.set_xlim(x_center - x_range/2, x_center + x_range/2)
+                ax.set_ylim(y_center - y_range/2, y_center + y_range/2)
+                ax.set_zlim(z_center - z_range/2, z_center + z_range/2)
+                canvas.draw()
+            
+            def zoom_out():
+                xlim = ax.get_xlim()
+                ylim = ax.get_ylim()
+                zlim = ax.get_zlim()
+                
+                x_center = (xlim[0] + xlim[1]) / 2
+                y_center = (ylim[0] + ylim[1]) / 2
+                z_center = (zlim[0] + zlim[1]) / 2
+                
+                x_range = (xlim[1] - xlim[0]) * 1.25
+                y_range = (ylim[1] - ylim[0]) * 1.25
+                z_range = (zlim[1] - zlim[0]) * 1.25
+                
+                ax.set_xlim(x_center - x_range/2, x_center + x_range/2)
+                ax.set_ylim(y_center - y_range/2, y_center + y_range/2)
+                ax.set_zlim(z_center - z_range/2, z_center + z_range/2)
+                canvas.draw()
+            
+            def reset_view():
+                ax.autoscale()
+                ax.view_init(elev=25, azim=45)
+                canvas.draw()
+            
+            tk.Button(controls_frame, text="Z+", 
+                     command=zoom_in,
+                     font=("Arial", 8, "bold"), bg='#27ae60', fg='white', 
+                     relief=tk.FLAT, padx=8, pady=3).pack(side=tk.LEFT, padx=2)
+            
+            tk.Button(controls_frame, text="Z-", 
+                     command=zoom_out,
+                     font=("Arial", 8, "bold"), bg='#e67e22', fg='white', 
+                     relief=tk.FLAT, padx=8, pady=3).pack(side=tk.LEFT, padx=2)
+            
+            tk.Button(controls_frame, text="↻ Reset", 
+                     command=reset_view,
+                     font=("Arial", 8), bg='#95a5a6', fg='white', 
+                     relief=tk.FLAT, padx=8, pady=3).pack(side=tk.LEFT, padx=2)
+        
+        # Mostrar canvas
+        canvas.get_tk_widget().pack(side=tk.TOP, fill=tk.BOTH, expand=True)
         canvas.draw()
-        canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
         
         self.status_var.set("Visualizacion completada")
         self.progress_var.set(0)
@@ -938,11 +1085,11 @@ Listo para resolucion automatica"""
         
         info_text.config(state=tk.NORMAL)
         info_text.insert(1.0, """Caracteristicas:
-€¢ Torso: cilindro (15cm o— 50cm)
-€¢ Corazon: esfera (5cm)
-€¢ Pulmones: elipsoides (4o—6o—9 cm)
-€¢ Conductividades realistas
-€¢ Tiempo: 1-2 minutos""")
+    Torso: cilindro (15cm o— 50cm)
+    Corazon: esfera (5cm)
+    Pulmones: elipsoides (4o—6o—9 cm)
+    Conductividades realistas
+    Tiempo: 1-2 minutos""")
         info_text.config(state=tk.DISABLED)
         
         # Separador
@@ -1010,10 +1157,14 @@ Listo para resolucion automatica"""
                     # Activar bandera para NO resolver automáticamente JUSTO ANTES de cargar
                     self.skip_auto_solve = True
                     
+                    # Marcar que el modelo fue generado automáticamente
+                    self.is_auto_generated = True
+                    self.auto_generated_with_lungs = include_lungs
+                    
                     self.process_file(generated_file)
                     
-                    # Esperar a que se cargue y mostrar en panel principal
-                    self.root.after(500, lambda: self.show_model_in_main_panel(include_lungs))
+                    # Esperar a que se cargue y mostrar en panel principal (vista estática)
+                    self.root.after(500, lambda: self.show_model_static_view(include_lungs))
                     
                 except Exception as e:
                     messagebox.showerror("Error", f"Error generando modelo:\n{str(e)}")
@@ -1041,8 +1192,215 @@ Listo para resolucion automatica"""
                               activebackground='#7f8c8d')
         cancel_btn.pack(fill=tk.X)
 
+    def _simplify_surface(self, triangles, vertices, target_ratio=0.3):
+        """Simplifica una superficie reduciendo el número de triángulos"""
+        try:
+            # Si hay pocos triángulos, no simplificar
+            if len(triangles) < 1000:
+                return triangles
+            
+            # Submuestreo simple: tomar cada N triángulos
+            step = max(1, int(1.0 / target_ratio))
+            simplified = triangles[::step]
+            
+            print(f"  Simplificado: {len(triangles)} → {len(simplified)} triángulos")
+            return simplified
+            
+        except Exception as e:
+            print(f"  Error simplificando: {e}, usando original")
+            return triangles
+
+    def show_model_static_view(self, include_lungs):
+        """Muestra el modelo generado en vista estática optimizada (sin interacción)"""
+        try:
+            # Limpiar el area de visualizacion
+            self._clear_plot_area()
+            
+            # Crear figura 3D estática
+            from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+            import matplotlib.pyplot as plt
+            from matplotlib.colors import ListedColormap
+            from collections import Counter
+            
+            # Desactivar modo interactivo de matplotlib
+            plt.ioff()
+            
+            # Reducir DPI para mejor rendimiento
+            fig = Figure(figsize=(8, 6), dpi=75)
+            ax = fig.add_subplot(111, projection='3d')
+            
+            # Deshabilitar interacción del mouse
+            ax.mouse_init = lambda: None
+            
+            # Obtener datos de la malla
+            X = self.mesh.p.T
+            
+            # Visualizar por materiales con optimización
+            try:
+                mat_labels = None
+                
+                if hasattr(self.mio, 'cell_data_dict'):
+                    datos = self.mio.cell_data_dict
+                    
+                    if "gmsh:physical" in datos and "tetra" in datos["gmsh:physical"]:
+                        mat_labels = datos["gmsh:physical"]["tetra"].flatten().astype(int)
+                    elif mat_labels is None:
+                        for clave, bloques in datos.items():
+                            if "tetra" in bloques:
+                                arr = bloques["tetra"].flatten()
+                                vals = np.unique(arr)
+                                if len(vals) <= 20 and arr.min() >= 0:
+                                    mat_labels = arr.astype(int)
+                                    break
+                
+                if mat_labels is not None and len(mat_labels) > 0:
+                    if 'tetra' in self.mio.cells_dict:
+                        tetrahedra = self.mio.cells_dict['tetra']
+                    else:
+                        raise ValueError("No se encontraron tetraedros")
+                    
+                    colors_map = {
+                        4: ('#2ECC71', 'Pulmon der', 0.7),
+                        3: ('#F39C12', 'Pulmon izq', 0.7),
+                        2: ('#E74C3C', 'Corazon', 0.8),
+                        1: ('#5DADE2', 'Torso', 0.3),
+                    }
+                    
+                    surfaces_to_plot = []
+                    
+                    for material_id in [4, 3, 2, 1]:
+                        if material_id not in colors_map:
+                            continue
+                        
+                        if material_id not in np.unique(mat_labels):
+                            continue
+                        
+                        color, name, alpha = colors_map[material_id]
+                        material_mask = mat_labels == material_id
+                        n_tets = material_mask.sum()
+                        
+                        if n_tets == 0:
+                            continue
+                        
+                        material_tets = tetrahedra[material_mask]
+                        
+                        # Optimización: usar set para faces en lugar de lista
+                        faces_set = []
+                        for tet in material_tets:
+                            faces_set.append(tuple(sorted([tet[0], tet[1], tet[2]])))
+                            faces_set.append(tuple(sorted([tet[0], tet[1], tet[3]])))
+                            faces_set.append(tuple(sorted([tet[0], tet[2], tet[3]])))
+                            faces_set.append(tuple(sorted([tet[1], tet[2], tet[3]])))
+                        
+                        face_counts = Counter(faces_set)
+                        surface_faces = [face for face, count in face_counts.items() if count == 1]
+                        
+                        if len(surface_faces) > 0:
+                            surface_tris = np.array(surface_faces)
+                            
+                            # OPTIMIZACIÓN: Simplificar superficie para vista estática
+                            # Torso: reducir más (30%), órganos: reducir menos (50%)
+                            ratio = 0.25 if material_id == 1 else 0.4
+                            surface_tris = self._simplify_surface(surface_tris, X, ratio)
+                            
+                            surfaces_to_plot.append({
+                                'triangles': surface_tris,
+                                'color': color,
+                                'alpha': alpha,
+                                'name': name
+                            })
+                    
+                    from mpl_toolkits.mplot3d.art3d import Poly3DCollection
+                    from matplotlib.colors import to_rgba
+                    
+                    collections = []
+                    legend_handles = []
+                    
+                    for surf_data in surfaces_to_plot:
+                        triangles = surf_data['triangles']
+                        verts = []
+                        for tri in triangles:
+                            verts.append([X[tri[0]], X[tri[1]], X[tri[2]]])
+                        
+                        rgba_color = to_rgba(surf_data['color'], alpha=surf_data['alpha'])
+                        # Optimización: sin bordes en vista estática
+                        collection = Poly3DCollection(verts, 
+                                                     facecolors=rgba_color,
+                                                     edgecolors='none',
+                                                     linewidths=0)
+                        collections.append(collection)
+                        
+                        import matplotlib.patches as mpatches
+                        legend_handles.append(mpatches.Patch(color=surf_data['color'], 
+                                                            alpha=surf_data['alpha'],
+                                                            label=surf_data['name']))
+                    
+                    for collection in collections:
+                        ax.add_collection3d(collection)
+                    
+                    ax.set_xlim(X[:, 0].min(), X[:, 0].max())
+                    ax.set_ylim(X[:, 1].min(), X[:, 1].max())
+                    ax.set_zlim(X[:, 2].min(), X[:, 2].max())
+                    
+                    ax.legend(handles=legend_handles, loc='upper right', fontsize=9, 
+                             framealpha=0.95, edgecolor='gray', fancybox=True)
+                    
+                else:
+                    raise ValueError("Sin etiquetas")
+                    
+            except Exception as e:
+                colors = X[:, 2]
+                surf = ax.plot_trisurf(X[:, 0], X[:, 1], X[:, 2], 
+                                     triangles=self.tris, alpha=0.8,
+                                     cmap='viridis', linewidth=0, 
+                                     edgecolor='none')
+                surf.set_array(colors[self.tris].mean(axis=1))
+                cbar = fig.colorbar(surf, ax=ax, shrink=0.6, aspect=10)
+                cbar.set_label("Altura (Z)", rotation=270, labelpad=15, fontsize=9)
+            
+            tipo = "sin pulmones" if not include_lungs else "con pulmones"
+            ax.set_title(f"Modelo Generado ({tipo})", fontsize=12, fontweight='bold', pad=20)
+            ax.set_xlabel("X (m)", fontsize=9)
+            ax.set_ylabel("Y (m)", fontsize=9)
+            ax.set_zlabel("Z (m)", fontsize=9)
+            ax.view_init(elev=25, azim=45)
+            ax.set_box_aspect([1,1,1])
+            
+            # Desactivar grid para mejor rendimiento
+            ax.grid(False)
+            
+            fig.tight_layout()
+            
+            # Crear canvas SIN toolbar (vista estática)
+            canvas = FigureCanvasTkAgg(fig, self.plot_frame)
+            canvas.get_tk_widget().pack(side=tk.TOP, fill=tk.BOTH, expand=True)
+            
+            # Mensaje informativo
+            info_frame = tk.Frame(self.plot_frame, bg='#fffacd', relief=tk.RAISED, bd=2)
+            info_frame.pack(side=tk.BOTTOM, fill=tk.X, padx=10, pady=10)
+            
+            tk.Label(info_frame, text="Vista estática del modelo generado. Usa el botón 'Vista Previa' para interactuar con zoom y rotación.", 
+                    font=("Arial", 9), bg='#fffacd', fg='#333', wraplength=600, justify=tk.LEFT).pack(padx=10, pady=8)
+            
+            canvas.draw()
+            
+            # Actualizar estado
+            self.status_var.set("Modelo generado exitosamente")
+            self.progress_var.set(100)
+            
+            # Rehabilitar botones
+            self.file_button.config(state=tk.NORMAL)
+            self.preview_button.config(state=tk.NORMAL)
+            self.auto_solve_button.config(state=tk.NORMAL)
+            self.manual_solve_button.config(state=tk.NORMAL)
+            
+        except Exception as e:
+            messagebox.showerror("Error", f"Error mostrando modelo:\n{str(e)}")
+            import traceback
+            traceback.print_exc()
+
     def show_model_in_main_panel(self, include_lungs):
-        """Muestra el modelo generado en el panel de visualizacion principal"""
+        """Muestra el modelo generado en el panel de visualizacion principal con interacción completa"""
         try:
             # Limpiar el area de visualizacion
             self._clear_plot_area()
@@ -1056,7 +1414,12 @@ Listo para resolucion automatica"""
             # Desactivar modo interactivo de matplotlib
             plt.ioff()
             
-            fig = Figure(figsize=(8, 6), dpi=100)
+            # Mostrar mensaje de carga
+            self.status_var.set("Preparando vista interactiva...")
+            self.root.update()
+            
+            # Reducir DPI para mejor rendimiento
+            fig = Figure(figsize=(8, 6), dpi=85)
             ax = fig.add_subplot(111, projection='3d')
             
             # Obtener datos de la malla
@@ -1148,7 +1511,7 @@ Listo para resolucion automatica"""
                         
                         if len(surface_faces) > 0:
                             surface_tris = np.array(surface_faces)
-                            print(f"  †’ Superficie: {len(surface_tris)} triangulos")
+                            print(f"  Superficie: {len(surface_tris)} triangulos")
                             
                             # Guardar para dibujar despues
                             surfaces_to_plot.append({
@@ -1158,7 +1521,7 @@ Listo para resolucion automatica"""
                                 'name': name
                             })
                         else:
-                            print(f"  š  No se encontro superficie para {name}")
+                            print(f" No se encontro superficie para {name}")
                     
                     # NUEVA ESTRATEGIA: Crear todas las colecciones 3D primero, luego agregarlas juntas
                     print(f"Construyendo figura con {len(surfaces_to_plot)} superficies...")
@@ -1177,12 +1540,12 @@ Listo para resolucion automatica"""
                         for tri in triangles:
                             verts.append([X[tri[0]], X[tri[1]], X[tri[2]]])
                         
-                        # Crear la coleccion 3D
+                        # Crear la coleccion 3D (optimizado)
                         rgba_color = to_rgba(surf_data['color'], alpha=surf_data['alpha'])
                         collection = Poly3DCollection(verts, 
                                                      facecolors=rgba_color,
-                                                     edgecolors='darkgray',
-                                                     linewidths=0.05)
+                                                     edgecolors='none',
+                                                     linewidths=0)
                         collections.append(collection)
                         
                         # Crear handle para la leyenda
@@ -1220,8 +1583,8 @@ Listo para resolucion automatica"""
                 colors = X[:, 2]
                 surf = ax.plot_trisurf(X[:, 0], X[:, 1], X[:, 2], 
                                      triangles=self.tris, alpha=0.8,
-                                     cmap='viridis', linewidth=0.1, 
-                                     edgecolor='gray')
+                                     cmap='viridis', linewidth=0, 
+                                     edgecolor='none')
                 surf.set_array(colors[self.tris].mean(axis=1))
                 cbar = fig.colorbar(surf, ax=ax, shrink=0.6, aspect=10)
                 cbar.set_label("Altura (Z)", rotation=270, labelpad=15, fontsize=9)
