@@ -304,21 +304,13 @@ def crear_figura_3d_con_electrodos(malla, mio, sources, incluir_pulmones=False):
     if sources is not None:
         S = np.asarray(sources, dtype=float)
         if S.size > 0:
-            print(f"\n=== DIBUJANDO {len(S)} ELECTRODOS ===")
-            for i, (x, y, z) in enumerate(S):
-                print(f"Electrodo {i+1}: ({x:.6f}, {y:.6f}, {z:.6f})")
-            
             # Verificar si hay electrodos duplicados
             if len(S) > 1:
-                distancias = []
                 for i in range(len(S)):
                     for j in range(i+1, len(S)):
                         dist = np.linalg.norm(S[i] - S[j])
-                        distancias.append(dist)
                         if dist < 0.001:  # Menos de 1mm
-                            print(f"⚠️ ADVERTENCIA: Electrodos {i+1} y {j+1} están muy cerca ({dist*1000:.2f}mm)")
-                
-                print(f"Distancia promedio entre electrodos: {np.mean(distancias)*1000:.2f}mm")
+                            print(f"ADVERTENCIA: Electrodos {i+1} y {j+1} están muy cerca ({dist*1000:.2f}mm)")
             
             # Calcular centro del modelo
             centro = X.mean(axis=0)
@@ -353,7 +345,6 @@ def crear_figura_3d_con_electrodos(malla, mio, sources, incluir_pulmones=False):
                                 0.002 * (i - len(S)/2)
                             ])
                             S_visual[i] += offset
-                            print(f"Aplicando offset visual a electrodo {i+1}")
             
             ax.scatter(S_visual[:, 0], S_visual[:, 1], S_visual[:, 2], 
                       s=250, c="red", marker='o', 
@@ -374,8 +365,6 @@ def crear_figura_3d_con_electrodos(malla, mio, sources, incluir_pulmones=False):
             # Agregar electrodo a la leyenda
             manejadores_leyenda.append(mpatches.Patch(color='red', alpha=1.0, 
                                                      label=f'Electrodos ({len(S)})'))
-            
-            print("=" * 40 + "\n")
         
         # Actualizar leyenda
         ax.legend(handles=manejadores_leyenda, loc='upper right', fontsize=9, 

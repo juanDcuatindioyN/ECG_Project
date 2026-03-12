@@ -170,26 +170,12 @@ def solve_poisson_point(mesh, sources, charges):
     used = []
     c = mesh.p.mean(axis=1)  # centroide
     
-    print(f"\n=== PROYECTANDO {len(sources)} FUENTES AL INTERIOR ===")
-    print(f"Centroide de la malla: ({c[0]:.6f}, {c[1]:.6f}, {c[2]:.6f})")
-    
-    for idx, (s, q) in enumerate(zip(np.asarray(sources, float), np.asarray(charges, float))):
-        print(f"\nFuente {idx+1}:")
-        print(f"  Original: ({s[0]:.6f}, {s[1]:.6f}, {s[2]:.6f})")
-        print(f"  Dentro?: {_is_inside(mesh, s)}")
-        
+    for s, q in zip(np.asarray(sources, float), np.asarray(charges, float)):
         s_in = _project_inside(mesh, s)
-        
         if not _is_inside(mesh, s_in):
-            print(f"  ⚠️ Proyección falló, usando centroide")
             s_in = c  # usar centroide si la proyección falla
-        
-        print(f"  Proyectada: ({s_in[0]:.6f}, {s_in[1]:.6f}, {s_in[2]:.6f})")
-        
         b += q * basis.point_source(s_in)
         used.append(s_in)
-    
-    print("=" * 50 + "\n")
     
     D = basis.get_dofs()
     # Usar enforce para condiciones de frontera Dirichlet

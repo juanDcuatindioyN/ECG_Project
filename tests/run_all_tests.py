@@ -20,7 +20,7 @@ from test_gui import run_gui_tests
 
 def test_project_structure():
     """Verifica la estructura del proyecto"""
-    print("📁 VERIFICANDO ESTRUCTURA DEL PROYECTO")
+    print(" VERIFICANDO ESTRUCTURA DEL PROYECTO")
     print("="*50)
     
     required_dirs = ['src', 'tests', 'examples', 'docs', 'data']
@@ -37,23 +37,23 @@ def test_project_structure():
     missing_items = []
     
     # Verificar directorios
-    print("🔍 Verificando directorios...")
+    print(" Verificando directorios...")
     for dir_name in required_dirs:
         dir_path = os.path.join('..', dir_name)
         if os.path.exists(dir_path):
-            print(f"   ✅ {dir_name}/")
+            print(f"   {dir_name}/")
         else:
-            print(f"   ❌ {dir_name}/ - FALTANTE")
+            print(f"   {dir_name}/ - FALTANTE")
             missing_items.append(f"directorio {dir_name}")
     
     # Verificar archivos
-    print("\n🔍 Verificando archivos principales...")
+    print("\n Verificando archivos principales...")
     for file_name in required_files:
         file_path = os.path.join('..', file_name)
         if os.path.exists(file_path):
-            print(f"   ✅ {file_name}")
+            print(f"    {file_name}")
         else:
-            print(f"   ❌ {file_name} - FALTANTE")
+            print(f"    {file_name} - FALTANTE")
             missing_items.append(f"archivo {file_name}")
     
     # Verificar archivo de datos
@@ -61,12 +61,12 @@ def test_project_structure():
     data_found = False
     for data_file in data_files:
         if os.path.exists(os.path.join('..', data_file)):
-            print(f"   ✅ {data_file} (archivo de datos)")
+            print(f"    {data_file} (archivo de datos)")
             data_found = True
             break
     
     if not data_found:
-        print("   ⚠️ Sphere.vtk no encontrado en ubicaciones esperadas")
+        print("    Sphere.vtk no encontrado en ubicaciones esperadas")
         missing_items.append("archivo de datos Sphere.vtk")
     
     return len(missing_items) == 0, missing_items
@@ -74,7 +74,7 @@ def test_project_structure():
 
 def test_dependencies():
     """Verifica las dependencias"""
-    print("\n📦 VERIFICANDO DEPENDENCIAS")
+    print("\n VERIFICANDO DEPENDENCIAS")
     print("="*50)
     
     required_packages = [
@@ -91,32 +91,32 @@ def test_dependencies():
     
     missing_required = []
     
-    print("🔍 Dependencias requeridas...")
+    print(" Dependencias requeridas...")
     for package, description in required_packages:
         try:
             if package == 'tkinter':
                 import tkinter
             else:
                 __import__(package)
-            print(f"   ✅ {package:15} - {description}")
+            print(f"    {package:15} - {description}")
         except ImportError:
-            print(f"   ❌ {package:15} - {description} (FALTANTE)")
+            print(f"    {package:15} - {description} (FALTANTE)")
             missing_required.append(package)
     
-    print("\n🔍 Dependencias opcionales...")
+    print("\n Dependencias opcionales...")
     for package, description in optional_packages:
         try:
             __import__(package)
-            print(f"   ✅ {package:15} - {description}")
+            print(f"    {package:15} - {description}")
         except ImportError:
-            print(f"   ⚠️ {package:15} - {description} (no disponible)")
+            print(f"    {package:15} - {description} (no disponible)")
     
     return len(missing_required) == 0, missing_required
 
 
 def main():
     """Ejecuta todas las pruebas"""
-    print("🧪 SUITE COMPLETA DE PRUEBAS - PROYECTO ECG")
+    print(" SUITE COMPLETA DE PRUEBAS - PROYECTO ECG")
     print("="*60)
     print()
     
@@ -128,9 +128,9 @@ def main():
         structure_ok, missing_items = test_project_structure()
         all_tests.append(("Estructura del proyecto", structure_ok))
         if not structure_ok:
-            print(f"\n⚠️ Elementos faltantes: {', '.join(missing_items)}")
+            print(f"\n Elementos faltantes: {', '.join(missing_items)}")
     except Exception as e:
-        print(f"❌ Error verificando estructura: {e}")
+        print(f"ERROR Error verificando estructura: {e}")
         all_tests.append(("Estructura del proyecto", False))
     
     print()
@@ -140,9 +140,9 @@ def main():
         deps_ok, missing_deps = test_dependencies()
         all_tests.append(("Dependencias", deps_ok))
         if not deps_ok:
-            print(f"\n⚠️ Dependencias faltantes: {', '.join(missing_deps)}")
+            print(f"\n Dependencias faltantes: {', '.join(missing_deps)}")
     except Exception as e:
-        print(f"❌ Error verificando dependencias: {e}")
+        print(f"ERROR Error verificando dependencias: {e}")
         all_tests.append(("Dependencias", False))
     
     print()
@@ -152,7 +152,7 @@ def main():
         core_ok = run_core_tests()
         all_tests.append(("Módulo Core", core_ok))
     except Exception as e:
-        print(f"❌ Error en pruebas core: {e}")
+        print(f"ERROR Error en pruebas core: {e}")
         traceback.print_exc()
         all_tests.append(("Módulo Core", False))
     
@@ -163,18 +163,18 @@ def main():
         gui_ok = run_gui_tests()
         all_tests.append(("Módulo GUI", gui_ok))
     except Exception as e:
-        print(f"❌ Error en pruebas GUI: {e}")
+        print(f" Error en pruebas GUI: {e}")
         traceback.print_exc()
         all_tests.append(("Módulo GUI", False))
     
     # Resumen final
     print("\n" + "="*60)
-    print("🏆 RESUMEN FINAL DE TODAS LAS PRUEBAS")
+    print(" RESUMEN FINAL DE TODAS LAS PRUEBAS")
     print("="*60)
     
     all_passed = True
     for name, passed in all_tests:
-        status = "✅ PASÓ" if passed else "❌ FALLÓ"
+        status = " PASÓ" if passed else " FALLÓ"
         print(f"{name:25} - {status}")
         if not passed:
             all_passed = False
@@ -182,17 +182,17 @@ def main():
     print("\n" + "="*60)
     
     if all_passed:
-        print("🎉 ¡TODAS LAS PRUEBAS PASARON!")
-        print("\n✨ El proyecto está completamente funcional:")
+        print(" ¡TODAS LAS PRUEBAS PASARON!")
+        print("\n El proyecto está completamente funcional:")
         print("   • Estructura correcta")
         print("   • Dependencias instaladas")
         print("   • Módulos funcionando")
         print("   • Interfaz operativa")
-        print("\n🚀 Para usar la aplicación:")
+        print("\n Para usar la aplicación:")
         print("   python main.py")
     else:
-        print("⚠️ ALGUNAS PRUEBAS FALLARON")
-        print("\n🔧 Acciones recomendadas:")
+        print(" ALGUNAS PRUEBAS FALLARON")
+        print("\n Acciones recomendadas:")
         print("   1. Instalar dependencias faltantes")
         print("   2. Verificar estructura de archivos")
         print("   3. Revisar errores específicos arriba")

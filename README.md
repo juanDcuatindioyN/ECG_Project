@@ -2,7 +2,7 @@
 
 Simulador completo del problema directo del electrocardiograma (ECG) usando el método de elementos finitos (FEM). Interfaz gráfica con generador automático de modelos anatómicos.
 
-## 🚀 Inicio Rápido
+## Inicio Rapido
 
 ```bash
 # Instalar dependencias
@@ -56,7 +56,7 @@ ECG_Project/
 └── requirements.txt                          # Dependencias
 ```
 
-## 🎯 Características
+## Caracteristicas
 
 - Interfaz gráfica con Tkinter
 - Soporte multi-formato de mallas
@@ -87,13 +87,13 @@ resultados = solver.ejecutar_pipeline_completo()
 derivaciones = resultados['ecg_data']['leads']
 ```
 
-## 📚 Documentación
+## Documentacion
 
 - [QUICK_START.md](docs/QUICK_START.md) - Guía de inicio rápido
 - [ECG_SOLVER_GUIDE.md](docs/ECG_SOLVER_GUIDE.md) - Guía técnica del solver
 - [GENERADOR_AUTOMATICO.md](docs/GENERADOR_AUTOMATICO.md) - Guía del generador
 
-## 📦 Dependencias
+## Dependencias
 
 - numpy >= 1.19.0
 - scipy >= 1.5.0

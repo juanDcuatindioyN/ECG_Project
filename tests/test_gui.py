@@ -19,39 +19,39 @@ from src.gui import ECGApp
 
 def test_gui_imports():
     """Prueba las importaciones de GUI"""
-    print("🔍 Probando importaciones de GUI...")
+    print(" Probando importaciones de GUI...")
     
     try:
         import tkinter as tk
         from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
         from matplotlib.figure import Figure
-        print("   ✅ Tkinter y Matplotlib")
+        print("   OK Tkinter y Matplotlib")
         
         try:
             from tkinterdnd2 import DND_FILES, TkinterDnD
-            print("   ✅ TkinterDnD (Drag & Drop disponible)")
+            print("   OK TkinterDnD (Drag & Drop disponible)")
             dnd_available = True
         except ImportError:
-            print("   ⚠️ TkinterDnD no disponible (Drag & Drop deshabilitado)")
+            print("   ADVERTENCIA TkinterDnD no disponible (Drag & Drop deshabilitado)")
             dnd_available = False
         
         return True, dnd_available
         
     except Exception as e:
-        print(f"   ❌ Error en importaciones: {e}")
+        print(f"   ERROR Error en importaciones: {e}")
         return False, False
 
 
 def test_app_creation():
     """Prueba la creación de la aplicación"""
-    print("\n🔍 Probando creación de aplicación...")
+    print("\n Probando creación de aplicación...")
     
     try:
         root = tk.Tk()
         root.withdraw()  # Ocultar ventana
         
         app = ECGApp(root)
-        print("   ✅ Aplicación creada correctamente")
+        print("   OK Aplicación creada correctamente")
         
         # Verificar que los componentes principales existen
         assert hasattr(app, 'mesh'), "App debe tener atributo mesh"
@@ -62,14 +62,14 @@ def test_app_creation():
         return True
         
     except Exception as e:
-        print(f"   ❌ Error: {e}")
+        print(f"   ERROR Error: {e}")
         traceback.print_exc()
         return False
 
 
 def test_parameter_parsing():
     """Prueba el parseo de parámetros"""
-    print("\n🔍 Probando parseo de parámetros...")
+    print("\n Probando parseo de parámetros...")
     
     try:
         root = tk.Tk()
@@ -82,14 +82,14 @@ def test_parameter_parsing():
         app.charges_var.set("1.0")
         
         sources, charges = app.parse_sources_and_charges()
-        print(f"   ✅ Fuente simple: {sources.shape}, {charges.shape}")
+        print(f"   OK Fuente simple: {sources.shape}, {charges.shape}")
         
         # Probar múltiples fuentes
         app.sources_var.set("0.5,-0.4,0.1;-0.2,0.3,0.0")
         app.charges_var.set("1.0,-0.5")
         
         sources, charges = app.parse_sources_and_charges()
-        print(f"   ✅ Múltiples fuentes: {sources.shape}, {charges.shape}")
+        print(f"   OK Múltiples fuentes: {sources.shape}, {charges.shape}")
         
         assert sources.shape[0] == charges.shape[0], "Número de fuentes debe coincidir con cargas"
         
@@ -97,14 +97,14 @@ def test_parameter_parsing():
         return True
         
     except Exception as e:
-        print(f"   ❌ Error: {e}")
+        print(f"   ERROR Error: {e}")
         traceback.print_exc()
         return False
 
 
 def test_ui_components():
     """Prueba los componentes de UI"""
-    print("\n🔍 Probando componentes de UI...")
+    print("\n Probando componentes de UI...")
     
     try:
         root = tk.Tk()
@@ -121,26 +121,26 @@ def test_ui_components():
         for widget_name in widgets_to_check:
             assert hasattr(app, widget_name), f"Falta widget: {widget_name}"
         
-        print("   ✅ Todos los widgets principales presentes")
+        print("   OK Todos los widgets principales presentes")
         
         # Verificar estados iniciales
         assert app.preview_button['state'] == 'disabled', "Preview debe estar deshabilitado inicialmente"
         assert app.solve_button['state'] == 'disabled', "Solve debe estar deshabilitado inicialmente"
         
-        print("   ✅ Estados iniciales correctos")
+        print("   OK Estados iniciales correctos")
         
         root.destroy()
         return True
         
     except Exception as e:
-        print(f"   ❌ Error: {e}")
+        print(f"   ERROR Error: {e}")
         traceback.print_exc()
         return False
 
 
 def test_error_handling():
     """Prueba el manejo de errores"""
-    print("\n🔍 Probando manejo de errores...")
+    print("\n Probando manejo de errores...")
     
     try:
         root = tk.Tk()
@@ -154,10 +154,10 @@ def test_error_handling():
         
         try:
             sources, charges = app.parse_sources_and_charges()
-            print("   ❌ Debería haber fallado con parámetros inválidos")
+            print("   ERROR Debería haber fallado con parámetros inválidos")
             return False
         except ValueError:
-            print("   ✅ Error capturado correctamente para parámetros inválidos")
+            print("   OK Error capturado correctamente para parámetros inválidos")
         
         # Probar número inconsistente de fuentes/cargas
         app.sources_var.set("0.5,-0.4,0.1;-0.2,0.3,0.0")
@@ -165,16 +165,16 @@ def test_error_handling():
         
         try:
             sources, charges = app.parse_sources_and_charges()
-            print("   ❌ Debería haber fallado con número inconsistente")
+            print("   ERROR Debería haber fallado con número inconsistente")
             return False
         except ValueError:
-            print("   ✅ Error capturado correctamente para número inconsistente")
+            print("   OK Error capturado correctamente para número inconsistente")
         
         root.destroy()
         return True
         
     except Exception as e:
-        print(f"   ❌ Error inesperado: {e}")
+        print(f"   ERROR Error inesperado: {e}")
         traceback.print_exc()
         return False
 
@@ -198,17 +198,17 @@ def run_gui_tests():
             result = test_func()
             results.append((name, result))
         except Exception as e:
-            print(f"❌ Error en prueba {name}: {e}")
+            print(f"ERROR Error en prueba {name}: {e}")
             results.append((name, False))
     
     # Resumen
     print("\n" + "="*50)
-    print("📊 RESUMEN - PRUEBAS GUI")
+    print(" RESUMEN - PRUEBAS GUI")
     print("="*50)
     
     all_passed = True
     for name, passed in results:
-        status = "✅ PASÓ" if passed else "❌ FALLÓ"
+        status = "OK PASÓ" if passed else "ERROR FALLÓ"
         print(f"{name:25} - {status}")
         if not passed:
             all_passed = False

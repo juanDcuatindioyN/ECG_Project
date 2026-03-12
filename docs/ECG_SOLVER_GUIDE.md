@@ -140,7 +140,7 @@ solution_data = solve_ecg_system(K, F_matrix, mesh, surface_nodes, dipole_pos)
 **Estrategia:**
 1. Seleccionar nodo de referencia (más alejado del dipolo en superficie)
 2. Aplicar condición de gauge: φ[ref_node] = 0
-3. Eliminar fila y columna → K_red (N-1, N-1)
+3. Eliminar fila y columna -> K_red (N-1, N-1)
 4. Resolver K_red·φ_red = f_red para cada instante
 
 **Solver:**

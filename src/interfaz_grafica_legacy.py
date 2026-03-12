@@ -118,13 +118,6 @@ def auto_detect_sources(mesh, num_sources=3):
         sources = center + offsets
         charges = np.array([1.0, -0.8, 0.6, -0.4])
         
-        print(f"\n=== GENERANDO 4 FUENTES ===")
-        print(f"Centro de la malla: ({center[0]:.4f}, {center[1]:.4f}, {center[2]:.4f})")
-        print(f"Radio usado: {radio:.4f} m")
-        for i, (s, c) in enumerate(zip(sources, charges)):
-            print(f"Fuente {i+1}: ({s[0]:.4f}, {s[1]:.4f}, {s[2]:.4f}), carga {c:.2f}")
-        print("=" * 40 + "\n")
-        
     else:
         # Para mas fuentes, distribucion aleatoria estratificada
         np.random.seed(42)  # Para reproducibilidad
@@ -496,7 +489,7 @@ ecuacion de Poisson con parametros optimos.""")
         self.task_queue.put(('load_mesh', file_path))
 
     def process_queue(self):
-        """Procesa tareas del queue de forma segura"""
+        """Procesa tareas de forma segura"""
         try:
             while True:
                 task_type, data = self.task_queue.get_nowait()
@@ -566,19 +559,8 @@ ecuacion de Poisson con parametros optimos.""")
         """Maneja la resolucion automatica"""
         def solve_in_background():
             try:
-                # Mostrar coordenadas de fuentes antes de resolver
-                print("\n=== ELECTRODOS CONFIGURADOS ===")
-                for i, (source, charge) in enumerate(zip(self.auto_sources, self.auto_charges)):
-                    print(f"Electrodo {i+1}: posición ({source[0]:.4f}, {source[1]:.4f}, {source[2]:.4f}), carga {charge:.2f}")
-                
                 # Resolver con parametros automaticos
                 basis, V, used_sources = solve_poisson_point(self.mesh, self.auto_sources, self.auto_charges)
-                
-                # Mostrar coordenadas de fuentes proyectadas (usadas realmente)
-                print("\n=== ELECTRODOS PROYECTADOS (USADOS) ===")
-                for i, source in enumerate(used_sources):
-                    print(f"Electrodo {i+1}: posición ({source[0]:.4f}, {source[1]:.4f}, {source[2]:.4f})")
-                print("=" * 40 + "\n")
                 
                 # Crear visualización con modelo completo
                 fig = plot_surface(self.mesh, self.tris, V, sources=used_sources, 
@@ -896,7 +878,7 @@ Listo para resolucion automatica"""
         controls_frame = tk.Frame(self.plot_frame, bg='#f0f0f0', relief=tk.RAISED, bd=1)
         controls_frame.pack(side=tk.TOP, fill=tk.X, padx=5, pady=5)
         
-        tk.Label(controls_frame, text="🎮 Controles:", 
+        tk.Label(controls_frame, text=" Controles:", 
                 font=("Arial", 9, "bold"), bg='#f0f0f0').pack(side=tk.LEFT, padx=5)
         
         # Obtener el axes 3D
@@ -986,7 +968,7 @@ Listo para resolucion automatica"""
                      font=("Arial", 8, "bold"), bg='#e67e22', fg='white', 
                      relief=tk.FLAT, padx=8, pady=3).pack(side=tk.LEFT, padx=2)
             
-            tk.Button(controls_frame, text="↻ Reset", 
+            tk.Button(controls_frame, text=" Reset", 
                      command=reset_view,
                      font=("Arial", 8), bg='#95a5a6', fg='white', 
                      relief=tk.FLAT, padx=8, pady=3).pack(side=tk.LEFT, padx=2)
@@ -1178,7 +1160,7 @@ Listo para resolucion automatica"""
                 messagebox.showerror("Error", f"Error al iniciar generacion:\n{e}")
         
         # Botones de accion
-        generate_btn = tk.Button(button_frame, text="š™ï¸ Generar Modelo", 
+        generate_btn = tk.Button(button_frame, text="ADVERTENCIA™ï¸ Generar Modelo", 
                                 command=generate_and_preview,
                                 font=("Arial", 12, "bold"), bg='#27ae60', fg='white', 
                                 relief=tk.FLAT, padx=40, pady=12, cursor='hand2',
@@ -1203,7 +1185,7 @@ Listo para resolucion automatica"""
             step = max(1, int(1.0 / target_ratio))
             simplified = triangles[::step]
             
-            print(f"  Simplificado: {len(triangles)} → {len(simplified)} triángulos")
+            print(f"  Simplificado: {len(triangles)} -> {len(simplified)} triángulos")
             return simplified
             
         except Exception as e:
@@ -1437,7 +1419,7 @@ Listo para resolucion automatica"""
                     # Formato MSH: clave estandar de Gmsh
                     if "gmsh:physical" in datos and "tetra" in datos["gmsh:physical"]:
                         mat_labels = datos["gmsh:physical"]["tetra"].flatten().astype(int)
-                        print(f"œ“ Etiquetas encontradas (gmsh:physical): {np.unique(mat_labels)}")
+                        print(f"Etiquetas encontradas (gmsh:physical): {np.unique(mat_labels)}")
                     
                     # Formato VTK: buscar campo con IDs enteros pequenos
                     elif mat_labels is None:
@@ -1447,7 +1429,7 @@ Listo para resolucion automatica"""
                                 vals = np.unique(arr)
                                 if len(vals) <= 20 and arr.min() >= 0:
                                     mat_labels = arr.astype(int)
-                                    print(f"œ“ Etiquetas encontradas ({clave}): {vals}")
+                                    print(f"Etiquetas encontradas ({clave}): {vals}")
                                     break
                 
                 if mat_labels is not None and len(mat_labels) > 0:
@@ -1567,19 +1549,19 @@ Listo para resolucion automatica"""
                     # Agregar leyenda
                     ax.legend(handles=legend_handles, loc='upper right', fontsize=9, 
                              framealpha=0.95, edgecolor='gray', fancybox=True)
-                    print("œ“ Figura construida completamente")
+                    print("Figura construida completamente")
                     
                 else:
-                    print("š  No se encontraron etiquetas de material")
+                    print("No se encontraron etiquetas de material")
                     raise ValueError("Sin etiquetas")
                     
             except Exception as e:
-                print(f"š  Error procesando materiales: {e}")
+                print(f"Error procesando materiales: {e}")
                 import traceback
                 traceback.print_exc()
                 
                 # Fallback: visualizacion por altura
-                print("†’ Usando visualizacion por altura (fallback)")
+                print("->’ Usando visualizacion por altura (fallback)")
                 colors = X[:, 2]
                 surf = ax.plot_trisurf(X[:, 0], X[:, 1], X[:, 2], 
                                      triangles=self.tris, alpha=0.8,
@@ -1616,7 +1598,7 @@ Listo para resolucion automatica"""
             controls_frame = tk.Frame(self.plot_frame, bg='#f0f0f0', relief=tk.RAISED, bd=1)
             controls_frame.pack(side=tk.TOP, fill=tk.X, padx=5, pady=5)
             
-            tk.Label(controls_frame, text="🎮 Controles:", 
+            tk.Label(controls_frame, text=" Controles:", 
                     font=("Arial", 9, "bold"), bg='#f0f0f0').pack(side=tk.LEFT, padx=5)
             
             # Botones de vista
@@ -1714,14 +1696,14 @@ Listo para resolucion automatica"""
                      font=("Arial", 10, "bold"), bg='#e67e22', fg='white', 
                      relief=tk.FLAT, padx=8, pady=2).pack(side=tk.LEFT, padx=2)
             
-            tk.Button(controls_frame, text="ðŸ”„ Reset", 
+            tk.Button(controls_frame, text="”„ Reset", 
                      command=reset_view,
                      font=("Arial", 8), bg='#95a5a6', fg='white', 
                      relief=tk.FLAT, padx=8, pady=3).pack(side=tk.LEFT, padx=2)
             
             # Instrucciones
             instructions = tk.Label(self.plot_frame, 
-                                  text="ðŸ’¡ Arrastra con el mouse para rotar | Usa la rueda para zoom | Botones para vistas predefinidas",
+                                  text=" Arrastra con el mouse para rotar | Usa la rueda para zoom | Botones para vistas predefinidas",
                                   font=("Arial", 8), bg='white', fg='#7f8c8d')
             instructions.pack(side=tk.TOP, pady=3)
             
@@ -1729,7 +1711,7 @@ Listo para resolucion automatica"""
             canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
             print("Dibujando canvas...")
             canvas.draw()
-            print("œ“ Canvas mostrado")
+            print("OK“ Canvas mostrado")
             
             # Habilitar rotacion con mouse
             def on_mouse_press(event):

@@ -1,10 +1,10 @@
 # Guía del Generador Automático de Modelos
 
-## 🏥 Introducción
+## Introduccion
 
 El Generador Automático de Modelos es una herramienta integrada en la GUI que permite crear modelos 3D realistas de torso con corazón y pulmones, listos para simulaciones de ECG.
 
-## ✨ Características
+## Caracteristicas
 
 - **Geometría anatómica realista** basada en proporciones humanas
 - **Vista previa 3D** antes de generar la malla
@@ -13,7 +13,7 @@ El Generador Automático de Modelos es una herramienta integrada en la GUI que p
 - **Conductividades eléctricas** realistas por tejido
 - **Integración completa** con la GUI y el solver ECG
 
-## 📐 Especificaciones del Modelo
+## Especificaciones del Modelo
 
 ### Geometría
 
@@ -43,7 +43,7 @@ El Generador Automático de Modelos es una herramienta integrada en la GUI que p
   - Órganos: 1 cm
 - **Elementos**: ~5,000-15,000 tetraedros (según configuración)
 
-## 🚀 Uso desde la GUI
+## Uso desde la GUI
 
 ### Paso 1: Abrir el Generador
 
@@ -53,7 +53,7 @@ python main.py
 
 En la interfaz, haz clic en el botón:
 ```
-🏥 Generar Modelo Automático
+Generar Modelo Automatico
 ```
 
 ### Paso 2: Configurar Opciones
@@ -72,7 +72,7 @@ Se abrirá un diálogo con dos opciones:
 
 ### Paso 3: Vista Previa
 
-Haz clic en **"👁 Vista Previa"** para ver una representación 3D del modelo antes de generarlo.
+Haz clic en **"Vista Previa"** para ver una representación 3D del modelo antes de generarlo.
 
 La vista previa muestra:
 - Torso (cilindro azul transparente)
@@ -97,7 +97,7 @@ Una vez generada:
 - Se carga automáticamente en la GUI
 - Está lista para simulaciones
 
-## 💻 Uso desde Código Python
+## Uso desde Codigo Python
 
 ### Ejemplo Básico
 
@@ -164,7 +164,7 @@ leads = results['ecg_data']['leads']
 print(f"Lead I: {abs(leads['I']).max() * 1000:.2f} mV")
 ```
 
-## 🔧 Requisitos
+## Requisitos
 
 ### Dependencias
 
@@ -180,13 +180,13 @@ El generador requiere **Gmsh** para crear la geometría y generar la malla.
 from src.model_generator import HAS_GMSH
 
 if HAS_GMSH:
-    print("✅ Gmsh está instalado")
+    print("OK Gmsh está instalado")
 else:
-    print("❌ Gmsh no está instalado")
+    print("ERROR Gmsh no está instalado")
     print("Instala con: pip install gmsh")
 ```
 
-## 📊 Comparación de Modelos
+## Comparacion de Modelos
 
 | Característica | Con Pulmones | Sin Pulmones |
 |----------------|--------------|--------------|
@@ -197,7 +197,7 @@ else:
 | Conductividades | 4 tejidos | 2 tejidos |
 | Uso recomendado | Investigación | Pruebas rápidas |
 
-## 🎯 Casos de Uso
+## Casos de Uso
 
 ### 1. Investigación ECG
 ```python
@@ -225,7 +225,7 @@ for radio in [0.12, 0.15, 0.18]:
                         output_path=f'torso_r{radio}.msh')
 ```
 
-## ⚠️ Notas Importantes
+## Notas Importantes
 
 1. **Tiempo de generación**: La primera generación puede tardar más mientras Gmsh se inicializa
 
@@ -239,7 +239,7 @@ for radio in [0.12, 0.15, 0.18]:
 
 6. **Visualización**: Los materiales se muestran TODOS JUNTOS desde el inicio (torso transparente + corazón opaco visible simultáneamente)
 
-## 🎨 Visualización del Modelo
+## Visualizacion del Modelo
 
 ### Renderizado Simultáneo
 
