@@ -1,4 +1,4 @@
-# 🫀 Proyecto ECG - Simulador de ECG con FEM
+#  Proyecto ECG - Simulador de ECG con FEM
 
 Simulador completo del problema directo del electrocardiograma (ECG) usando el método de elementos finitos (FEM). Interfaz gráfica con generador automático de modelos anatómicos.
 
@@ -12,7 +12,7 @@ pip install -r requirements.txt
 python main.py
 ```
 
-## 📂 Estructura del Proyecto
+##  Estructura del Proyecto
 
 ```
 ECG_Project/
@@ -32,11 +32,11 @@ ECG_Project/
 └── requirements.txt                          # Dependencias
 ```
 
-## 📂 Formatos Soportados
+##  Formatos Soportados
 
 VTK, Gmsh (.msh), STL, OBJ, PLY, OFF y más formatos gracias a **meshio**. Ver [docs/FORMATOS_SOPORTADOS.txt](docs/FORMATOS_SOPORTADOS.txt).
 
-## 📁 Estructura del Proyecto
+##  Estructura del Proyecto
 
 ```
 ECG_Project/
@@ -66,7 +66,7 @@ ECG_Project/
 - Solver ECG completo con FEM (5 pasos)
 - 12 derivaciones ECG estándar
 
-## 📖 Uso
+##  Uso
 
 ### Interfaz Gráfica
 ```bash
@@ -74,9 +74,9 @@ python main.py
 ```
 
 ### Generar Modelo Automático
-1. Clic en "🏥 Generar Modelo Automático"
+1. Clic en " Generar Modelo Automático"
 2. Seleccionar "Con pulmones" o "Sin pulmones"
-3. Clic en "⚙ Generar Malla"
+3. Clic en " Generar Malla"
 
 ### API Programática
 ```python
@@ -104,4 +104,4 @@ derivaciones = resultados['ecg_data']['leads']
 ---
 
 **Versión**: 3.0.0  
-**Estado**: ✅ Funcional
+**Estado**:  Funcional
