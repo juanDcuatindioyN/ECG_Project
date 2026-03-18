@@ -2,14 +2,39 @@
 
 Simulador completo del problema directo del electrocardiograma (ECG) usando el método de elementos finitos (FEM). Interfaz gráfica con generador automático de modelos anatómicos.
 
+
+## Requisito: Python 3.13
+
+Las dependencias (numpy, scipy, scikit-fem) están compiladas para **Python 3.13**.
+El venv incluido usa Python 3.14 que es incompatible — usa `py -3.13` directamente.
+
 ## Inicio Rapido
 
 ```bash
-# Instalar dependencias
-pip install -r requirements.txt
+# Verificar Python 3.13 disponible
+py -3.13 --version
+
+# Instalar dependencias en Python 3.13
+py -3.13 -m pip install -r requirements.txt
 
 # Iniciar aplicación
-python main.py
+py -3.13 main.py
+
+# Ejecutar demo del solver ECG completo (desde la raíz del proyecto)
+py -3.13 -m examples.demo_ecg_solver
+```
+
+## Crear entorno virtual con Python 3.13
+
+```bash
+# Crear venv con Python 3.13 (no 3.14)
+py -3.13 -m venv venv313
+
+# Activar
+.\venv313\Scripts\Activate.ps1
+
+# Instalar dependencias
+pip install -r requirements.txt
 ```
 
 ##  Estructura del Proyecto

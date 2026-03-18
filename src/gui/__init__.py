@@ -13,9 +13,9 @@ Módulos:
 """
 
 from .controles_visualizacion_3d import (
-    crear_controles_vista,
-    crear_controles_zoom,
-    configurar_controles_mouse
+    create_view_controls as crear_controles_vista,
+    create_zoom_controls as crear_controles_zoom,
+    setup_mouse_controls as configurar_controles_mouse
 )
 
 __all__ = [

@@ -1,6 +1,6 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 """
-Pruebas para el módulo core del proyecto ECG
+Pruebas para el mÃ³dulo core del proyecto ECG
 ===========================================
 
 Prueba las funciones principales de procesamiento VTK y Poisson.
@@ -14,17 +14,17 @@ import numpy as np
 # Agregar el directorio padre al path para importar src
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-from src.core import load_mesh_skfem, extract_surface_tris, solve_poisson_point, plot_surface
+from src.nucleo_poisson import load_mesh_skfem, extract_surface_tris, solve_poisson_point, plot_surface
 
 
 def test_vtk_loading():
     """Prueba la carga de archivos VTK"""
     print("Probando carga de archivos VTK...")
     
-    vtk_file = os.path.join('..', 'data', 'Sphere.vtk')
+    vtk_file = os.path.join(os.path.dirname(__file__), '..', 'data', 'Sphere.vtk')
     if not os.path.exists(vtk_file):
-        vtk_file = 'Sphere.vtk'  # Fallback a ubicación actual
-    
+        vtk_file = os.path.join('data', 'Sphere.vtk')
+
     if not os.path.exists(vtk_file):
         print("   Archivo Sphere.vtk no encontrado - saltando prueba")
         return True
@@ -46,45 +46,45 @@ def test_vtk_loading():
 
 
 def test_surface_extraction():
-    """Prueba la extracción de superficie"""
-    print("\n🔍 Probando extracción de superficie...")
+    """Prueba la extracciÃ³n de superficie"""
+    print("\nðŸ” Probando extracciÃ³n de superficie...")
     
-    vtk_file = os.path.join('..', 'data', 'Sphere.vtk')
+    vtk_file = os.path.join(os.path.dirname(__file__), '..', 'data', 'Sphere.vtk')
     if not os.path.exists(vtk_file):
         vtk_file = 'Sphere.vtk'
     
     if not os.path.exists(vtk_file):
-        print("   ⚠️ Archivo Sphere.vtk no encontrado - saltando prueba")
+        print("   âš ï¸ Archivo Sphere.vtk no encontrado - saltando prueba")
         return True
     
     try:
         mesh, mio = load_mesh_skfem(vtk_file)
         tris = extract_surface_tris(mio, mesh)
         
-        print(f"   ✅ Superficie extraída: {len(tris)} triángulos")
+        print(f"   âœ… Superficie extraÃ­da: {len(tris)} triÃ¡ngulos")
         
-        # Verificar que los triángulos son válidos
-        assert len(tris) > 0, "Debe haber al menos un triángulo"
-        assert tris.shape[1] == 3, "Cada triángulo debe tener 3 vértices"
+        # Verificar que los triÃ¡ngulos son vÃ¡lidos
+        assert len(tris) > 0, "Debe haber al menos un triÃ¡ngulo"
+        assert tris.shape[1] == 3, "Cada triÃ¡ngulo debe tener 3 vÃ©rtices"
         
         return True
         
     except Exception as e:
-        print(f"   ❌ Error: {e}")
+        print(f"   âŒ Error: {e}")
         traceback.print_exc()
         return False
 
 
 def test_poisson_solver():
     """Prueba el solucionador de Poisson"""
-    print("\n🔍 Probando solucionador de Poisson...")
+    print("\nðŸ” Probando solucionador de Poisson...")
     
-    vtk_file = os.path.join('..', 'data', 'Sphere.vtk')
+    vtk_file = os.path.join(os.path.dirname(__file__), '..', 'data', 'Sphere.vtk')
     if not os.path.exists(vtk_file):
         vtk_file = 'Sphere.vtk'
     
     if not os.path.exists(vtk_file):
-        print("   ⚠️ Archivo Sphere.vtk no encontrado - saltando prueba")
+        print("   âš ï¸ Archivo Sphere.vtk no encontrado - saltando prueba")
         return True
     
     try:
@@ -98,44 +98,44 @@ def test_poisson_solver():
         # Resolver
         basis, V, used_sources = solve_poisson_point(mesh, sources, charges)
         
-        print(f"   ✅ Poisson resuelto: {V.shape if hasattr(V, 'shape') else len(V)} valores")
-        print(f"   📊 Fuentes usadas: {len(used_sources)}")
+        print(f"   âœ… Poisson resuelto: {V.shape if hasattr(V, 'shape') else len(V)} valores")
+        print(f"   ðŸ“Š Fuentes usadas: {len(used_sources)}")
         
         # Verificar resultados
         V_arr = V.toarray().ravel() if hasattr(V, 'toarray') else np.asarray(V).ravel()
-        assert len(V_arr) == mesh.p.shape[1], "Solución debe tener un valor por nodo"
-        assert np.all(np.isfinite(V_arr)), "Solución debe ser finita"
+        assert len(V_arr) == mesh.p.shape[1], "SoluciÃ³n debe tener un valor por nodo"
+        assert np.all(np.isfinite(V_arr)), "SoluciÃ³n debe ser finita"
         
         return True
         
     except Exception as e:
-        print(f"   ❌ Error: {e}")
+        print(f"   âŒ Error: {e}")
         traceback.print_exc()
         return False
 
 
 def test_multiple_sources():
-    """Prueba con múltiples fuentes"""
-    print("\n🔍 Probando múltiples fuentes...")
+    """Prueba con mÃºltiples fuentes"""
+    print("\nðŸ” Probando mÃºltiples fuentes...")
     
-    vtk_file = os.path.join('..', 'data', 'Sphere.vtk')
+    vtk_file = os.path.join(os.path.dirname(__file__), '..', 'data', 'Sphere.vtk')
     if not os.path.exists(vtk_file):
         vtk_file = 'Sphere.vtk'
     
     if not os.path.exists(vtk_file):
-        print("   ⚠️ Archivo Sphere.vtk no encontrado - saltando prueba")
+        print("   âš ï¸ Archivo Sphere.vtk no encontrado - saltando prueba")
         return True
     
     try:
         mesh, mio = load_mesh_skfem(vtk_file)
         
-        # Múltiples fuentes
+        # MÃºltiples fuentes
         sources = np.array([[0.3, 0.0, 0.1], [-0.3, 0.0, -0.1]])
         charges = np.array([1.0, -0.5])
         
         basis, V, used_sources = solve_poisson_point(mesh, sources, charges)
         
-        print(f"   ✅ Múltiples fuentes resueltas: {len(used_sources)} fuentes")
+        print(f"   âœ… MÃºltiples fuentes resueltas: {len(used_sources)} fuentes")
         
         # Verificar que se usaron todas las fuentes
         assert len(used_sources) == len(sources), "Deben usarse todas las fuentes"
@@ -143,21 +143,21 @@ def test_multiple_sources():
         return True
         
     except Exception as e:
-        print(f"   ❌ Error: {e}")
+        print(f"   âŒ Error: {e}")
         traceback.print_exc()
         return False
 
 
 def test_visualization():
-    """Prueba la generación de visualizaciones"""
-    print("\n🔍 Probando visualización...")
+    """Prueba la generaciÃ³n de visualizaciones"""
+    print("\nðŸ” Probando visualizaciÃ³n...")
     
-    vtk_file = os.path.join('..', 'data', 'Sphere.vtk')
+    vtk_file = os.path.join(os.path.dirname(__file__), '..', 'data', 'Sphere.vtk')
     if not os.path.exists(vtk_file):
         vtk_file = 'Sphere.vtk'
     
     if not os.path.exists(vtk_file):
-        print("   ⚠️ Archivo Sphere.vtk no encontrado - saltando prueba")
+        print("   âš ï¸ Archivo Sphere.vtk no encontrado - saltando prueba")
         return True
     
     try:
@@ -171,9 +171,9 @@ def test_visualization():
         
         # Crear figura
         fig = plot_surface(mesh, tris, V, sources=used_sources, 
-                          title="Prueba de Visualización")
+                          title="Prueba de VisualizaciÃ³n")
         
-        print("   ✅ Figura creada correctamente")
+        print("   âœ… Figura creada correctamente")
         
         # Verificar que la figura tiene contenido
         assert len(fig.axes) > 0, "La figura debe tener al menos un eje"
@@ -181,22 +181,22 @@ def test_visualization():
         return True
         
     except Exception as e:
-        print(f"   ❌ Error: {e}")
+        print(f"   âŒ Error: {e}")
         traceback.print_exc()
         return False
 
 
 def run_core_tests():
-    """Ejecuta todas las pruebas del módulo core"""
-    print("🧪 PRUEBAS DEL MÓDULO CORE")
+    """Ejecuta todas las pruebas del mÃ³dulo core"""
+    print("ðŸ§ª PRUEBAS DEL MÃ“DULO CORE")
     print("="*50)
     
     tests = [
         ("Carga VTK", test_vtk_loading),
-        ("Extracción superficie", test_surface_extraction),
+        ("ExtracciÃ³n superficie", test_surface_extraction),
         ("Solucionador Poisson", test_poisson_solver),
-        ("Múltiples fuentes", test_multiple_sources),
-        ("Visualización", test_visualization)
+        ("MÃºltiples fuentes", test_multiple_sources),
+        ("VisualizaciÃ³n", test_visualization)
     ]
     
     results = []
@@ -205,17 +205,17 @@ def run_core_tests():
             result = test_func()
             results.append((name, result))
         except Exception as e:
-            print(f"❌ Error en prueba {name}: {e}")
+            print(f"âŒ Error en prueba {name}: {e}")
             results.append((name, False))
     
     # Resumen
     print("\n" + "="*50)
-    print("📊 RESUMEN - PRUEBAS CORE")
+    print("ðŸ“Š RESUMEN - PRUEBAS CORE")
     print("="*50)
     
     all_passed = True
     for name, passed in results:
-        status = "✅ PASÓ" if passed else "❌ FALLÓ"
+        status = "âœ… PASÃ“" if passed else "âŒ FALLÃ“"
         print(f"{name:25} - {status}")
         if not passed:
             all_passed = False

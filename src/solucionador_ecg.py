@@ -565,6 +565,212 @@ def postprocess_ecg(mesh, surface_nodes, PHI, electrode_positions=None):
     }
 
 
+def plot_electrodes_on_torso(mesh, mio, electrode_nodes, surface_nodes,
+                              PHI=None, instant_idx=4,
+                              output_file="electrodos_torso.png"):
+    """
+    Visualiza los electrodos del ECG sobre la superficie 3D del torso.
+
+    Muestra el torso con materiales semitransparentes (torso, corazón,
+    pulmones) y marca los 9 electrodos (RA, LA, LL, V1-V6) como puntos
+    de colores sobre la superficie, con etiquetas y líneas de proyección.
+
+    Opcionalmente colorea la superficie con el mapa de potenciales del
+    instante indicado.
+
+    Args:
+        mesh: MeshTet de scikit-fem
+        mio: Objeto meshio con datos de materiales
+        electrode_nodes: dict {nombre: indice_nodo} de locate_electrodes()
+        surface_nodes: array de indices de nodos en la superficie
+        PHI: Potenciales (N, T), opcional — si se pasa colorea la superficie
+        instant_idx: Instante a mostrar en el mapa de potenciales (default 4 = pico QRS)
+        output_file: Ruta del archivo PNG de salida
+
+    Returns:
+        matplotlib.figure.Figure
+    """
+    import matplotlib
+    import matplotlib.pyplot as plt
+    import matplotlib.patches as mpatches
+    from matplotlib.figure import Figure
+    from mpl_toolkits.mplot3d.art3d import Poly3DCollection
+    from matplotlib.colors import to_rgba, Normalize
+    from matplotlib.cm import ScalarMappable
+    from collections import Counter
+
+    # --- Colores por tipo de electrodo ---
+    COLORES_ELECTRODO = {
+        "RA": ("#E74C3C", "^"),   # rojo, triángulo
+        "LA": ("#E74C3C", "^"),
+        "LL": ("#E74C3C", "^"),
+        "V1": ("#2980B9", "o"),   # azul, círculo
+        "V2": ("#2980B9", "o"),
+        "V3": ("#2980B9", "o"),
+        "V4": ("#2980B9", "o"),
+        "V5": ("#2980B9", "o"),
+        "V6": ("#2980B9", "o"),
+    }
+
+    # --- Colores de materiales (semitransparentes para ver electrodos) ---
+    MAT_CONFIG = {
+        1: ('#5DADE2', 'Torso',      0.10),
+        2: ('#E74C3C', 'Corazon',    0.35),
+        3: ('#F39C12', 'Pulmon izq', 0.25),
+        4: ('#2ECC71', 'Pulmon der', 0.25),
+    }
+
+    X = mesh.p.T  # (N, 3)
+
+    fig = Figure(figsize=(14, 6))
+    fig.suptitle("Electrodos ECG sobre la superficie del torso",
+                 fontsize=13, fontweight="bold")
+
+    # ---- Panel izquierdo: vista 3D con materiales ----
+    ax3d = fig.add_subplot(121, projection='3d')
+
+    # Extraer etiquetas de material
+    mat_labels = None
+    if hasattr(mio, 'cell_data_dict'):
+        datos = mio.cell_data_dict
+        if "gmsh:physical" in datos and "tetra" in datos["gmsh:physical"]:
+            mat_labels = datos["gmsh:physical"]["tetra"].flatten().astype(int)
+        else:
+            for clave, bloques in datos.items():
+                if "tetra" in bloques:
+                    arr = bloques["tetra"].flatten()
+                    if len(np.unique(arr)) <= 20 and arr.min() >= 0:
+                        mat_labels = arr.astype(int)
+                        break
+
+    # Dibujar superficies por material
+    legend_handles = []
+    if mat_labels is not None and "tetra" in mio.cells_dict:
+        tetras = mio.cells_dict["tetra"]
+        for mat_id in [4, 3, 2, 1]:
+            if mat_id not in MAT_CONFIG:
+                continue
+            if mat_id not in np.unique(mat_labels):
+                continue
+            color, nombre, alfa = MAT_CONFIG[mat_id]
+            mask_mat = mat_labels == mat_id
+            tets_mat = tetras[mask_mat]
+
+            # Extraer caras de superficie (aparecen solo 1 vez)
+            caras = []
+            for tet in tets_mat:
+                caras += [
+                    tuple(sorted([tet[0], tet[1], tet[2]])),
+                    tuple(sorted([tet[0], tet[1], tet[3]])),
+                    tuple(sorted([tet[0], tet[2], tet[3]])),
+                    tuple(sorted([tet[1], tet[2], tet[3]])),
+                ]
+            conteo = Counter(caras)
+            sup = [c for c, n in conteo.items() if n == 1]
+            if not sup:
+                continue
+
+            sup_arr = np.array(sup)
+            # Submuestreo para rendimiento
+            max_tris = {1: 300, 2: 400, 3: 300, 4: 300}.get(mat_id, 300)
+            if len(sup_arr) > max_tris:
+                idx = np.linspace(0, len(sup_arr) - 1, max_tris, dtype=int)
+                sup_arr = sup_arr[idx]
+
+            verts = [[X[t[0]], X[t[1]], X[t[2]]] for t in sup_arr]
+            col = Poly3DCollection(verts,
+                                   facecolors=to_rgba(color, alfa),
+                                   edgecolors='gray',
+                                   linewidths=0.1,
+                                   shade=False, antialiased=False)
+            ax3d.add_collection3d(col)
+            legend_handles.append(
+                mpatches.Patch(color=color, alpha=max(alfa, 0.5), label=nombre))
+
+    # Dibujar electrodos sobre la superficie
+    centro = X.mean(axis=0)
+    plotted_colors = {}
+    for nombre, nodo in electrode_nodes.items():
+        pos = X[nodo]
+        color_e, marker_e = COLORES_ELECTRODO.get(nombre, ("#8E44AD", "s"))
+
+        # Línea de proyección hacia afuera
+        dir_out = pos - centro
+        dir_out = dir_out / (np.linalg.norm(dir_out) + 1e-10)
+        p_ext = pos + dir_out * 0.025
+        ax3d.plot([pos[0], p_ext[0]], [pos[1], p_ext[1]], [pos[2], p_ext[2]],
+                  color=color_e, linewidth=1.2, alpha=0.7, linestyle='--')
+
+        # Punto del electrodo
+        ax3d.scatter(*pos, s=120, c=color_e, marker=marker_e,
+                     edgecolors='black', linewidth=0.8, zorder=1000, alpha=1.0)
+
+        # Etiqueta
+        ax3d.text(p_ext[0], p_ext[1], p_ext[2], f" {nombre}",
+                  fontsize=7, color=color_e, fontweight='bold', zorder=1001)
+
+        if color_e not in plotted_colors:
+            label = "Extremidades (RA,LA,LL)" if color_e == "#E74C3C" else "Precordiales (V1-V6)"
+            legend_handles.append(
+                mpatches.Patch(color=color_e, alpha=1.0, label=label))
+            plotted_colors[color_e] = True
+
+    ax3d.set_xlim(X[:, 0].min(), X[:, 0].max())
+    ax3d.set_ylim(X[:, 1].min(), X[:, 1].max())
+    ax3d.set_zlim(X[:, 2].min(), X[:, 2].max())
+    ax3d.set_xlabel("X (m)", fontsize=8)
+    ax3d.set_ylabel("Y (m)", fontsize=8)
+    ax3d.set_zlabel("Z (m)", fontsize=8)
+    ax3d.set_title("Vista 3D", fontsize=10, fontweight='bold')
+    ax3d.view_init(elev=20, azim=45)
+    ax3d.set_box_aspect([1, 1, 1])
+    ax3d.grid(False)
+    ax3d.xaxis.pane.fill = False
+    ax3d.yaxis.pane.fill = False
+    ax3d.zaxis.pane.fill = False
+    ax3d.legend(handles=legend_handles, loc='upper right', fontsize=7,
+                framealpha=0.9, ncol=1)
+
+    # ---- Panel derecho: mapa 2D frontal (XZ) con electrodos ----
+    ax2d = fig.add_subplot(122)
+
+    if len(surface_nodes) > 0:
+        coords_sup = X[surface_nodes]
+        if PHI is not None:
+            phi_sup = PHI[surface_nodes, instant_idx] * 1000  # mV
+            vmax = np.abs(phi_sup).max() or 1.0
+            sc = ax2d.scatter(coords_sup[:, 0], coords_sup[:, 2],
+                              c=phi_sup, cmap="RdBu_r", s=6,
+                              vmin=-vmax, vmax=vmax, alpha=0.7)
+            fig.colorbar(sc, ax=ax2d, label="Potencial (mV)", shrink=0.8)
+            ax2d.set_title(f"Vista frontal XZ — t={instant_idx} (pico QRS)", fontsize=10)
+        else:
+            ax2d.scatter(coords_sup[:, 0], coords_sup[:, 2],
+                         c='#5DADE2', s=6, alpha=0.4)
+            ax2d.set_title("Vista frontal XZ — superficie del torso", fontsize=10)
+
+    # Marcar electrodos en la vista 2D
+    for nombre, nodo in electrode_nodes.items():
+        pos = X[nodo]
+        color_e, marker_e = COLORES_ELECTRODO.get(nombre, ("#8E44AD", "s"))
+        ax2d.scatter(pos[0], pos[2], s=120, c=color_e,
+                     marker=marker_e, edgecolors='black',
+                     linewidth=0.8, zorder=10, alpha=1.0)
+        ax2d.annotate(nombre, (pos[0], pos[2]),
+                      textcoords="offset points", xytext=(5, 4),
+                      fontsize=7, color=color_e, fontweight='bold')
+
+    ax2d.set_xlabel("x (m)", fontsize=9)
+    ax2d.set_ylabel("z (m)", fontsize=9)
+    ax2d.set_aspect("equal")
+    ax2d.grid(True, linestyle="--", alpha=0.3)
+
+    fig.tight_layout()
+    fig.savefig(output_file, dpi=150, bbox_inches="tight")
+    print(f"  Figura guardada: {output_file}")
+    return fig
+
+
 # =============================================================
 # PIPELINE COMPLETO
 # =============================================================
@@ -661,7 +867,8 @@ class ECGSolver:
         """
         Retorna un resumen de los resultados.
         """
-        if not all([self.mesh_data, self.K, self.solution_data, self.ecg_data]):
+        if not all([self.mesh_data is not None, self.K is not None,
+                    self.solution_data is not None, self.ecg_data is not None]):
             return "Pipeline no ejecutado aún"
         
         mesh = self.mesh_data['mesh']

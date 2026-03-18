@@ -178,9 +178,10 @@ def solve_poisson_point(mesh, sources, charges):
         used.append(s_in)
     
     D = basis.get_dofs()
-    # Usar enforce para condiciones de frontera Dirichlet
+    # Aplicar condiciones de frontera Dirichlet y resolver
     xdir = np.zeros(basis.N)
-    V = enforce(A, b, D=D, x=xdir)[0]
+    A_bc, b_bc = enforce(A, b, D=D, x=xdir)
+    V = solve(A_bc, b_bc)
     
     return basis, V, np.vstack(used)
 

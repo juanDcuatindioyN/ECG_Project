@@ -36,6 +36,7 @@ from .solucionador_ecg import (
     build_source_matrix,
     solve_ecg_system,
     postprocess_ecg,
+    plot_electrodes_on_torso,
     DEFAULT_CONDUCTIVITIES,
     DEFAULT_DIPOLE_POS,
     DEFAULT_DIPOLE_TABLE,
@@ -82,6 +83,7 @@ __all__ = [
     'build_source_matrix',
     'solve_ecg_system',
     'postprocess_ecg',
+    'plot_electrodes_on_torso',
     # Generador
     'generate_mesh',
     'generar_malla',

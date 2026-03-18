@@ -265,35 +265,71 @@ class ECGAppAuto:
         self.process_queue()
 
     def create_widgets(self):
-        """Crea todos los widgets de la interfaz."""
+        """Crea todos los widgets de la interfaz con scroll en el panel izquierdo."""
         # Frame principal con dos paneles
         main_frame = tk.Frame(self.root, bg='#f0f0f0')
-        main_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        main_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=10)
         
-        # Panel izquierdo - Controles
-        left_panel = tk.Frame(main_frame, bg='white', relief=tk.RAISED, bd=2)
-        left_panel.pack(side=tk.LEFT, fill=tk.Y, padx=(0, 5))
-        left_panel.configure(width=400)
-        left_panel.pack_propagate(False)
-        
-        # Panel derecho - Visualizacion
+        # Configurar grid para el frame principal
+        main_frame.grid_rowconfigure(0, weight=1)
+
+        # Panel izquierdo: ancho fijo (ejemplo 220 px)
+        main_frame.grid_columnconfigure(0, weight=0, minsize=600)  # panel izquierdo fijo
+
+        # Panel derecho: ocupa todo el espacio restante
+        main_frame.grid_columnconfigure(1, weight=1)
+                    # panel derecho expande al resto
+
+        # Panel izquierdo con scroll
+        left_panel_container = tk.Frame(main_frame, bg='white')
+        left_panel_container.grid(row=0, column=0, sticky="nsew", padx=(0, 2))
+
+        canvas = tk.Canvas(left_panel_container, bg='white')
+        scrollbar = tk.Scrollbar(left_panel_container, orient="vertical", command=canvas.yview)
+        scrollable_frame = tk.Frame(canvas, bg='white')
+
+        # Ajustar scrollregion automáticamente
+        scrollable_frame.bind(
+            "<Configure>",
+            lambda e: canvas.configure(
+                scrollregion=canvas.bbox("all")
+            )
+        )
+
+        canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+        canvas.configure(yscrollcommand=scrollbar.set)
+
+        # Pack con expansión para permitir scroll
+        canvas.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
+
+        # Scroll con la rueda del mouse (Windows y Linux/Mac)
+        canvas.bind_all("<MouseWheel>", lambda event: canvas.yview_scroll(int(-1*(event.delta/120)), "units"))
+        canvas.bind_all("<Button-4>", lambda event: canvas.yview_scroll(-1, "units"))  # scroll up
+        canvas.bind_all("<Button-5>", lambda event: canvas.yview_scroll(1, "units"))   # scroll down
+
+        # Panel derecho - Visualización
         right_panel = tk.Frame(main_frame, bg='white', relief=tk.RAISED, bd=2)
-        right_panel.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True, padx=(5, 0))
-        
-        self.create_control_panel(left_panel)
+        right_panel.grid(row=0, column=1, sticky="nsew", padx=(2, 0))
+
+        # Usar scrollable_frame como panel izquierdo
+        self.create_control_panel(scrollable_frame)
         self.create_visualization_panel(right_panel)
 
-    def create_control_panel(self, parent):
-        """Crea el panel de controles para la version automatica."""
-        # Titulo
-        title_label = tk.Label(parent, text="Solucionador ECG\n(Automatico)", 
-                              font=("Arial", 18, "bold"), bg='white', fg='#2c3e50')
-        title_label.pack(pady=15)
 
-        # Seccion de carga de archivo
+
+
+    def create_control_panel(self, parent):
+        """Crea el panel de controles para la versión automática."""
+        # Título
+        title_label = tk.Label(parent, text="Solucionador ECG\n(Automático)", 
+                            font=("Arial", 18, "bold"), bg='white', fg='#2c3e50')
+        title_label.pack(pady=10)
+
+        # Sección de carga de archivo
         file_section = tk.LabelFrame(parent, text="Archivo de Malla", font=("Arial", 12, "bold"),
-                                   bg='white', fg='#34495e', padx=10, pady=10)
-        file_section.pack(fill=tk.X, padx=15, pady=10)
+                                bg='white', fg='#34495e', padx=10, pady=10)
+        file_section.pack(padx=5, pady=10)
 
         # Zona de drag & drop
         self.drop_frame = tk.Frame(file_section, bg='#ecf0f1', relief='solid', bd=2, height=80)
@@ -301,99 +337,165 @@ class ECGAppAuto:
         self.drop_frame.pack_propagate(False)
         
         if HAS_DND:
-            drop_text = "Arrastra aqui tu archivo de malla\n(.vtk, .msh, .vtu, .stl, .obj, etc.)"
+            drop_text = "Arrastra aquí tu archivo de malla\n(.vtk, .msh, .vtu, .stl, .obj, etc.)"
         else:
             drop_text = "Haz clic para seleccionar archivo de malla\n(.vtk, .msh, .vtu, .stl, .obj, etc.)"
             
         drop_label = tk.Label(self.drop_frame, text=drop_text, 
-                             font=("Arial", 10), bg='#ecf0f1', fg='#7f8c8d')
+                            font=("Arial", 10), bg='#ecf0f1', fg='#7f8c8d')
         drop_label.pack(expand=True)
         
-        # Boton de seleccion manual
+        # Botón de selección manual
         self.file_button = tk.Button(file_section, text="Seleccionar archivo de malla", 
-                                   command=self.load_file, font=("Arial", 10),
-                                   bg='#3498db', fg='white', relief=tk.FLAT, padx=20)
+                                command=self.load_file, font=("Arial", 10),
+                                bg='#3498db', fg='white', relief=tk.FLAT, padx=10)
         self.file_button.pack(pady=5)
         
         # Separador
         separator = tk.Frame(file_section, height=2, bg='#ecf0f1')
         separator.pack(fill=tk.X, pady=10)
-        
-        # Boton de modelo automatico
+
+
         if HAS_GMSH:
-            auto_model_button = tk.Button(file_section, text="Generar Modelo Automatico", 
+            auto_model_button = tk.Button(file_section, text="Generar Modelo Automático", 
                                         command=self.show_auto_model_dialog, 
                                         font=("Arial", 10, "bold"),
-                                        bg='#27ae60', fg='white', relief=tk.FLAT, padx=20)
+                                        bg='#27ae60', fg='white', relief=tk.FLAT, padx=10)
             auto_model_button.pack(pady=5)
             
             auto_label = tk.Label(file_section, 
-                                text="Genera modelo de torso con corazon y pulmones",
+                                text="Genera modelo de torso con corazón y pulmones",
                                 font=("Arial", 8), bg='white', fg='#7f8c8d')
             auto_label.pack(pady=(0, 5))
+
+
+
+
         
-        # Informacion del archivo
+        # Información del archivo
         self.file_info = tk.Text(file_section, height=6, font=("Consolas", 9), 
-                               bg='#f8f9fa', state=tk.DISABLED)
-        self.file_info.pack(fill=tk.X, pady=5)
+                            bg='#f8f9fa', state=tk.DISABLED)
+        self.file_info.pack(pady=5)
 
-        # Seccion de analisis automatico
-        analysis_section = tk.LabelFrame(parent, text="Analisis Automatico", 
-                                       font=("Arial", 12, "bold"), bg='white', fg='#34495e',
-                                       padx=10, pady=10)
-        analysis_section.pack(fill=tk.X, padx=15, pady=10)
+        # Sección de análisis automático
+        analysis_section = tk.LabelFrame(parent, text="Análisis Automático", 
+                                    font=("Arial", 12, "bold"), bg='white', fg='#34495e',
+                                    padx=10, pady=10)
+        analysis_section.pack(padx=5, pady=10)
 
-        # Informacion de analisis
+        # Información de análisis
         self.analysis_info = tk.Text(analysis_section, height=8, font=("Consolas", 9), 
-                                   bg='#f8f9fa', state=tk.DISABLED)
-        self.analysis_info.pack(fill=tk.X, pady=5)
+                                bg='#f8f9fa', state=tk.DISABLED)
+        self.analysis_info.pack(pady=5)
         
-        # Informacion inicial
+        # Información inicial
         self.analysis_info.config(state=tk.NORMAL)
-        self.analysis_info.insert(1.0, """MODO AUTOMATICO ACTIVADO
+        self.analysis_info.insert(1.0, """MODO AUTOMÁTICO ACTIVADO
 
-Caracteristicas automaticas:
-• Deteccion inteligente de fuentes optimas
-• Calculo automatico de cargas balanceadas
-• Resolucion inmediata tras cargar archivo
-• Analisis de complejidad de malla
+    Características automáticas:
+    • Detección inteligente de fuentes óptimas
+    • Cálculo automático de cargas balanceadas
+    • Resolución inmediata tras cargar archivo
+    • Análisis de complejidad de malla
 
-Simplemente carga un archivo VTK y la
-aplicacion resolvera automaticamente la
-ecuacion de Poisson con parametros optimos.""")
+    Simplemente carga un archivo VTK y la
+    aplicación resolverá automáticamente la
+    ecuación de Poisson con parámetros óptimos.""")
         self.analysis_info.config(state=tk.DISABLED)
 
-        # Botones de accion
+        # Botones de acción
         action_frame = tk.Frame(parent, bg='white')
-        action_frame.pack(fill=tk.X, padx=15, pady=20)
-        
+        action_frame.pack(padx=5, pady=20)
+
         self.preview_button = tk.Button(action_frame, text="Vista Previa", 
-                                      command=self.preview_mesh, state=tk.DISABLED,
-                                      font=("Arial", 11), bg='#f39c12', fg='white', 
-                                      relief=tk.FLAT, padx=20, pady=8)
-        self.preview_button.pack(fill=tk.X, pady=2)
-        
-        self.auto_solve_button = tk.Button(action_frame, text="Resolver Automaticamente", 
-                                         command=self.auto_solve, state=tk.DISABLED,
-                                         font=("Arial", 11, "bold"), bg='#27ae60', fg='white', 
-                                         relief=tk.FLAT, padx=20, pady=8)
-        self.auto_solve_button.pack(fill=tk.X, pady=2)
-        
+                                        command=self.preview_mesh, state=tk.DISABLED,
+                                        font=("Arial", 11), bg='#f39c12', fg='white', 
+                                        relief=tk.FLAT, padx=10, pady=8)
+        self.preview_button.pack(pady=2)
+
+        self.auto_solve_button = tk.Button(action_frame, text="Resolver Automáticamente", 
+                                        command=self.auto_solve, state=tk.DISABLED,
+                                        font=("Arial", 11, "bold"), bg='#27ae60', fg='white', 
+                                        relief=tk.FLAT, padx=10, pady=8)
+        self.auto_solve_button.pack(pady=2)
+
+        # 🔧 Aquí va tu botón de electrodos
+        self.modify_electrodes_button = tk.Button(
+            action_frame,
+            text="Modificar Electrodos y Resolver",
+            command=self.show_modify_electrodes, state=tk.DISABLED,
+            font=("Arial", 11, "bold"),
+            bg='#2980b9', fg='white',
+            relief=tk.FLAT, padx=10, pady=8
+        )
+        self.modify_electrodes_button.pack(pady=2)
+
         self.manual_solve_button = tk.Button(action_frame, text="Resolver Manualmente", 
-                                           command=self.show_manual_options, state=tk.DISABLED,
-                                           font=("Arial", 10), bg='#95a5a6', fg='white', 
-                                           relief=tk.FLAT, padx=20, pady=6)
-        self.manual_solve_button.pack(fill=tk.X, pady=2)
+                                            command=self.show_manual_options, state=tk.DISABLED,
+                                            font=("Arial", 10), bg='#95a5a6', fg='white', 
+                                            relief=tk.FLAT, padx=10, pady=6)
+        self.manual_solve_button.pack(pady=2)
+
 
         # Barra de progreso
         self.progress_bar = ttk.Progressbar(parent, variable=self.progress_var, 
-                                          maximum=100, mode='determinate')
-        self.progress_bar.pack(fill=tk.X, padx=15, pady=5)
+                                        maximum=100, mode='determinate')
+        self.progress_bar.pack(fill=tk.X, padx=5, pady=5)
         
         # Estado
         self.status_label = tk.Label(parent, textvariable=self.status_var, 
-                                   font=("Arial", 9), bg='white', fg='#7f8c8d', wraplength=350)
+                                font=("Arial", 9), bg='white', fg='#7f8c8d', wraplength=200)
         self.status_label.pack(pady=5)
+
+
+    
+
+    def show_modify_electrodes(self):
+        """Ventana para modificar electrodos y resolver automáticamente"""
+        if not self.mesh:
+            return
+
+        modify_window = tk.Toplevel(self.root)
+        modify_window.title("Modificar Electrodos")
+        modify_window.geometry("400x300")
+        modify_window.configure(bg='white')
+
+        # Título
+        tk.Label(modify_window, text="Editar Electrodos", 
+                font=("Arial", 14, "bold"), bg='white').pack(pady=10)
+
+        # Entrada de fuentes
+        tk.Label(modify_window, text="Fuentes (x,y,z):", bg='white').pack(anchor=tk.W, padx=20)
+        sources_var = tk.StringVar(value=self._format_sources_for_display(self.auto_sources or []))
+        sources_entry = tk.Entry(modify_window, textvariable=sources_var, width=50)
+        sources_entry.pack(fill=tk.X, padx=20, pady=5)
+
+        # Entrada de cargas
+        tk.Label(modify_window, text="Cargas:", bg='white').pack(anchor=tk.W, padx=20, pady=(10,0))
+        charges_var = tk.StringVar(value=self._format_charges_for_display(self.auto_charges or []))
+        charges_entry = tk.Entry(modify_window, textvariable=charges_var, width=50)
+        charges_entry.pack(fill=tk.X, padx=20, pady=5)
+
+        # Botones
+        def apply_changes():
+            try:
+                sources = self._parse_sources_string(sources_var.get())
+                charges = self._parse_charges_string(charges_var.get())
+                self.auto_sources = sources
+                self.auto_charges = charges
+                modify_window.destroy()
+                self.auto_solve()  # Resolver automáticamente después de modificar
+            except Exception as e:
+                messagebox.showerror("Error", f"Error en parámetros: {e}")
+
+        tk.Button(modify_window, text="Aplicar y Resolver", command=apply_changes,
+                bg='#27ae60', fg='white', padx=20).pack(pady=10)
+        tk.Button(modify_window, text="Cancelar", command=modify_window.destroy,
+                bg='#e74c3c', fg='white', padx=20).pack(pady=5)
+
+
+
+
 
     def create_visualization_panel(self, parent):
         """Crea el panel de visualizacion."""
@@ -556,28 +658,112 @@ ecuacion de Poisson con parametros optimos.""")
         self.task_queue.put(('solve_auto', None))
 
     def _handle_solve_auto(self):
-        """Maneja la resolucion automatica"""
+        """Maneja la resolucion automatica — ECG completo si la malla tiene materiales 1-4"""
         def solve_in_background():
             try:
-                # Resolver con parametros automaticos
-                basis, V, used_sources = solve_poisson_point(self.mesh, self.auto_sources, self.auto_charges)
-                
-                # Crear visualización con modelo completo
-                fig = plot_surface(self.mesh, self.tris, V, sources=used_sources, 
-                                 title="Solucion Automatica de Poisson 3D",
-                                 mio=self.mio)
-                
-                # Enviar resultado
-                self.task_queue.put(('update_ui', {
-                    'type': 'solution_ready',
-                    'figure': fig,
-                    'sources': used_sources,
-                    'solution': V
-                }))
-                
+                # Detectar si es malla ECG (tiene materiales 1,2,3,4)
+                is_ecg_mesh = False
+                if self.mio is not None and hasattr(self.mio, 'cell_data_dict'):
+                    datos = self.mio.cell_data_dict
+                    mat_arr = None
+                    if "gmsh:physical" in datos and "tetra" in datos["gmsh:physical"]:
+                        mat_arr = datos["gmsh:physical"]["tetra"].flatten().astype(int)
+                    else:
+                        for _, bloques in datos.items():
+                            if "tetra" in bloques:
+                                arr = bloques["tetra"].flatten()
+                                if len(np.unique(arr)) <= 20 and arr.min() >= 0:
+                                    mat_arr = arr.astype(int)
+                                    break
+                    if mat_arr is not None:
+                        unique_mats = set(np.unique(mat_arr).tolist())
+                        is_ecg_mesh = {1, 2} <= unique_mats  # al menos torso y corazón
+
+                if is_ecg_mesh:
+                    # --- Pipeline ECG completo ---
+                    from .solucionador_ecg import (
+                        load_mesh_with_conductivities,
+                        assemble_stiffness_matrix,
+                        build_source_matrix,
+                        solve_ecg_system,
+                        postprocess_ecg,
+                        plot_electrodes_on_torso,
+                        DEFAULT_CONDUCTIVITIES,
+                        DEFAULT_DIPOLE_POS,
+                        DEFAULT_DIPOLE_TABLE,
+                    )
+
+                    # Paso 1: cargar con conductividades
+                    mesh_data = load_mesh_with_conductivities(
+                        self.file_path, DEFAULT_CONDUCTIVITIES
+                    )
+
+                    # Paso 2: ensamblar K
+                    K = assemble_stiffness_matrix(
+                        mesh_data['basis'], mesh_data['sigma_field']
+                    )
+
+                    # Paso 3: fuentes cardíacas
+                    source_data = build_source_matrix(
+                        mesh_data['mesh'], DEFAULT_DIPOLE_POS, DEFAULT_DIPOLE_TABLE
+                    )
+
+                    # Paso 4: resolver
+                    solution_data = solve_ecg_system(
+                        K, source_data['F_matrix'],
+                        mesh_data['mesh'], mesh_data['surface_nodes'],
+                        DEFAULT_DIPOLE_POS
+                    )
+
+                    # Paso 5: postprocesar
+                    ecg_data = postprocess_ecg(
+                        mesh_data['mesh'], mesh_data['surface_nodes'],
+                        solution_data['PHI']
+                    )
+
+                    # Guardar resultados en self para reutilización
+                    self.ecg_mesh_data = mesh_data
+                    self.ecg_solution = solution_data
+                    self.ecg_data = ecg_data
+
+                    # Generar figura con electrodos sobre el torso
+                    fig = plot_electrodes_on_torso(
+                        mesh_data['mesh'],
+                        mesh_data['mio'],
+                        ecg_data['electrode_nodes'],
+                        mesh_data['surface_nodes'],
+                        PHI=solution_data['PHI'],
+                        instant_idx=4,
+                        output_file="electrodos_torso_gui.png"
+                    )
+
+                    self.task_queue.put(('update_ui', {
+                        'type': 'solution_ready',
+                        'figure': fig,
+                        'sources': [DEFAULT_DIPOLE_POS],
+                        'solution': solution_data['PHI'][:, 4]
+                    }))
+
+                else:
+                    # --- Poisson simple (comportamiento original) ---
+                    basis, V, used_sources = solve_poisson_point(
+                        self.mesh, self.auto_sources, self.auto_charges
+                    )
+                    fig = plot_surface(self.mesh, self.tris, V, sources=used_sources,
+                                       title="Solucion Automatica de Poisson 3D",
+                                       mio=self.mio)
+                    self.task_queue.put(('update_ui', {
+                        'type': 'solution_ready',
+                        'figure': fig,
+                        'sources': used_sources,
+                        'solution': V
+                    }))
+
             except Exception as e:
+                import traceback
+                traceback.print_exc()
                 self.task_queue.put(('show_error', f"Error en resolucion automatica: {e}"))
-        
+
         thread = threading.Thread(target=solve_in_background, daemon=True)
         thread.start()
 
@@ -727,7 +913,10 @@ Listo para resolucion automatica"""
             self.preview_button.config(state=tk.NORMAL)
             self.auto_solve_button.config(state=tk.NORMAL)
             self.manual_solve_button.config(state=tk.NORMAL)
+            self.modify_electrodes_button.config(state=tk.NORMAL)
             
+            
+
             self.status_var.set("Archivo cargado - Parametros automaticos calculados")
             self.progress_var.set(0)
             
@@ -749,10 +938,10 @@ Listo para resolucion automatica"""
             for i, source in enumerate(data['sources']):
                 sources_info += f"  {i+1}: ({source[0]:.3f}, {source[1]:.3f}, {source[2]:.3f})\n"
             
-            messagebox.showinfo("Solucion Automatica Completada", 
-                              f"Ecuacion de Poisson resuelta automaticamente!\n\n{sources_info}")
+            messagebox.showinfo("Solucion Completada", 
+                              f"Ecuacion resuelta exitosamente!\n\n{sources_info}")
             
-            self.status_var.set("Solucion automatica completada exitosamente")
+            self.status_var.set("Solucion completada exitosamente")
 
     def _handle_error(self, error_msg):
         """Maneja errores de forma segura"""
@@ -1375,6 +1564,8 @@ Listo para resolucion automatica"""
             self.preview_button.config(state=tk.NORMAL)
             self.auto_solve_button.config(state=tk.NORMAL)
             self.manual_solve_button.config(state=tk.NORMAL)
+            self.modify_electrodes_button.config(state=tk.NORMAL)
+
             
         except Exception as e:
             messagebox.showerror("Error", f"Error mostrando modelo:\n{str(e)}")
@@ -1756,6 +1947,8 @@ Listo para resolucion automatica"""
             self.preview_button.config(state=tk.NORMAL)
             self.auto_solve_button.config(state=tk.NORMAL)
             self.manual_solve_button.config(state=tk.NORMAL)
+            self.modify_electrodes_button.config(state=tk.NORMAL)
+
             
             # Mostrar mensaje informativo
             messagebox.showinfo(
@@ -1784,3 +1977,5 @@ Listo para resolucion automatica"""
                 self.preview_button.config(state=tk.NORMAL)
                 self.auto_solve_button.config(state=tk.NORMAL)
                 self.manual_solve_button.config(state=tk.NORMAL)
+                self.modify_electrodes_button.config(state=tk.NORMAL)
+

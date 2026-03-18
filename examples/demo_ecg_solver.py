@@ -24,7 +24,8 @@ import matplotlib.pyplot as plt
 # Agregar src al path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
-from solucionador_ecg import ECGSolver as SolucionadorECG
+from src.solucionador_ecg import ECGSolver as SolucionadorECG
+from src.solucionador_ecg import plot_electrodes_on_torso
 
 # Alias para compatibilidad con el código del demo
 ECGSolver = SolucionadorECG
@@ -191,18 +192,25 @@ def main():
     
     leads = results['ecg_data']['leads']
     times = results['source_data']['times']
-    
-    plot_ecg_leads(leads, times, "ecg_12_leads_demo.png")
-    
     mesh = results['mesh_data']['mesh']
+    mio = results['mesh_data']['mio']
     surface_nodes = results['mesh_data']['surface_nodes']
     PHI = results['solution_data']['PHI']
+    electrode_nodes = results['ecg_data']['electrode_nodes']
+
+    # Electrodos sobre el torso 3D + mapa de potenciales
+    plot_electrodes_on_torso(mesh, mio, electrode_nodes, surface_nodes,
+                             PHI=PHI, instant_idx=4,
+                             output_file="electrodos_torso_demo.png")
+
+    plot_ecg_leads(leads, times, "ecg_12_leads_demo.png")
     
     plot_potential_map(mesh, surface_nodes, PHI, times, 
                       instant_idx=4, output_file="potential_map_demo.png")
     
     print("\n[6/6] Demostración completada!")
     print("\nArchivos generados:")
+    print("  - electrodos_torso_demo.png  (electrodos sobre torso 3D)")
     print("  - ecg_12_leads_demo.png")
     print("  - potential_map_demo.png")
     

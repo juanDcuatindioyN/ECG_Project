@@ -14,8 +14,8 @@ import traceback
 # Agregar el directorio padre al path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-from test_core import run_core_tests
-from test_gui import run_gui_tests
+from tests.test_core import run_core_tests
+from tests.test_gui import run_gui_tests
 
 
 def test_project_structure():
@@ -26,47 +26,47 @@ def test_project_structure():
     required_dirs = ['src', 'tests', 'examples', 'docs', 'data']
     required_files = [
         'src/__init__.py',
-        'src/core.py', 
-        'src/gui.py',
-        'src/utils.py',
+        'src/nucleo_poisson.py',
+        'src/solucionador_ecg.py',
+        'src/interfaz_grafica_legacy.py',
         'main.py',
         'README.md',
         'requirements.txt'
     ]
-    
+
     missing_items = []
-    
+    base = os.path.join(os.path.dirname(__file__), '..')
+
     # Verificar directorios
     print(" Verificando directorios...")
     for dir_name in required_dirs:
-        dir_path = os.path.join('..', dir_name)
+        dir_path = os.path.join(base, dir_name)
         if os.path.exists(dir_path):
             print(f"   {dir_name}/")
         else:
             print(f"   {dir_name}/ - FALTANTE")
             missing_items.append(f"directorio {dir_name}")
-    
+
     # Verificar archivos
     print("\n Verificando archivos principales...")
     for file_name in required_files:
-        file_path = os.path.join('..', file_name)
+        file_path = os.path.join(base, file_name)
         if os.path.exists(file_path):
             print(f"    {file_name}")
         else:
             print(f"    {file_name} - FALTANTE")
             missing_items.append(f"archivo {file_name}")
-    
+
     # Verificar archivo de datos
-    data_files = ['data/Sphere.vtk', 'Sphere.vtk']  # Ubicaciones posibles
     data_found = False
-    for data_file in data_files:
-        if os.path.exists(os.path.join('..', data_file)):
+    for data_file in ['data/Sphere.vtk', 'data/ecg_torso_v2_con_pulmones.msh']:
+        if os.path.exists(os.path.join(base, data_file)):
             print(f"    {data_file} (archivo de datos)")
             data_found = True
             break
-    
+
     if not data_found:
-        print("    Sphere.vtk no encontrado en ubicaciones esperadas")
+        print("    Sphere.vtk no encontrado en data/")
         missing_items.append("archivo de datos Sphere.vtk")
     
     return len(missing_items) == 0, missing_items
@@ -78,11 +78,12 @@ def test_dependencies():
     print("="*50)
     
     required_packages = [
-        ('numpy', 'Cálculos numéricos'),
+        ('numpy',      'Cálculos numéricos'),
         ('matplotlib', 'Visualización'),
-        ('scikit-fem', 'Elementos finitos'),
-        ('meshio', 'Lectura VTK'),
-        ('tkinter', 'Interfaz gráfica')
+        ('skfem',      'Elementos finitos'),
+        ('meshio',     'Lectura VTK'),
+        ('tkinter',    'Interfaz gráfica'),
+        ('scipy',      'Solver lineal'),
     ]
     
     optional_packages = [
@@ -97,7 +98,7 @@ def test_dependencies():
             if package == 'tkinter':
                 import tkinter
             else:
-                __import__(package)
+                __import__(package.replace('-', '_'))
             print(f"    {package:15} - {description}")
         except ImportError:
             print(f"    {package:15} - {description} (FALTANTE)")

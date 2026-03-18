@@ -16,16 +16,16 @@ Módulos:
 """
 
 from .analisis_mallas import (
-    detectar_fuentes_automaticamente,
-    analizar_complejidad_malla,
-    obtener_texto_info_malla,
-    obtener_texto_info_analisis
+    auto_detect_sources as detectar_fuentes_automaticamente,
+    analyze_mesh_complexity as analizar_complejidad_malla,
+    get_mesh_info_text as obtener_texto_info_malla,
+    get_analysis_info_text as obtener_texto_info_analisis
 )
 from .formateadores_datos import (
-    formatear_fuentes_para_mostrar,
-    formatear_cargas_para_mostrar,
-    parsear_string_fuentes,
-    parsear_string_cargas
+    format_sources_for_display as formatear_fuentes_para_mostrar,
+    format_charges_for_display as formatear_cargas_para_mostrar,
+    parse_sources_string as parsear_string_fuentes,
+    parse_charges_string as parsear_string_cargas
 )
 
 __all__ = [
