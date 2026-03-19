@@ -37,116 +37,159 @@ except ImportError:
     print("Advertencia: No se pudo importar generador_modelos_anatomicos")
 
 
-def auto_detect_sources(mesh, num_sources=3):
+def auto_detect_sources(mesh, num_sources=3, mio=None):
     """
     Detecta automaticamente puntos optimos para fuentes de Poisson.
+    
+    Si mio esta disponible y contiene material 2 (corazon), las fuentes se
+    colocan directamente en nodos reales de la malla dentro del corazon,
+    garantizando que siempre esten dentro del dominio.
     
     Args:
         mesh: Malla scikit-fem
         num_sources: Numero de fuentes a generar
+        mio: Objeto meshio opcional para detectar nodos del corazon
         
     Returns:
         tuple: (sources, charges) arrays con fuentes y cargas automaticas
     """
-    # Obtener limites de la malla
-    bounds = {
-        'x': (float(mesh.p[0].min()), float(mesh.p[0].max())),
-        'y': (float(mesh.p[1].min()), float(mesh.p[1].max())),
-        'z': (float(mesh.p[2].min()), float(mesh.p[2].max()))
-    }
-    
-    # Calcular centro y dimensiones
-    center = np.array([
-        (bounds['x'][0] + bounds['x'][1]) / 2,
-        (bounds['y'][0] + bounds['y'][1]) / 2,
-        (bounds['z'][0] + bounds['z'][1]) / 2
-    ])
-    
-    dimensions = np.array([
-        bounds['x'][1] - bounds['x'][0],
-        bounds['y'][1] - bounds['y'][0],
-        bounds['z'][1] - bounds['z'][0]
-    ])
-    
-    # Estrategias de colocacion de fuentes
+    # Intentar usar nodos reales del corazon (material 2) si mio esta disponible
+    if mio is not None:
+        try:
+            heart_nodes = _get_heart_nodes(mesh, mio)
+            if heart_nodes is not None and len(heart_nodes) >= num_sources:
+                sources = _distribute_nodes_spatially(heart_nodes, num_sources)
+                charges = _make_charges(num_sources)
+                return sources, charges
+        except Exception:
+            pass  # Fallback a metodo geometrico
+
+    # Metodo geometrico (fallback)
+    center = mesh.p.mean(axis=1)
+    dimensions = mesh.p.max(axis=1) - mesh.p.min(axis=1)
+
     if num_sources == 1:
-        # Una fuente en el centro
         sources = np.array([center])
         charges = np.array([1.0])
-        
+
     elif num_sources == 2:
-        # Dipolo a lo largo del eje mas largo
-        max_dim_idx = np.argmax(dimensions)
+        max_dim_idx = int(np.argmax(dimensions))
         offset = np.zeros(3)
-        offset[max_dim_idx] = dimensions[max_dim_idx] * 0.3
-        
-        sources = np.array([
-            center + offset,
-            center - offset
-        ])
+        offset[max_dim_idx] = dimensions[max_dim_idx] * 0.15
+        sources = np.array([center + offset, center - offset])
         charges = np.array([1.0, -1.0])
-        
+
     elif num_sources == 3:
-        # Configuracion triangular en el plano XY
-        radius = min(dimensions[:2]) * 0.25
+        radius = float(min(dimensions[:2])) * 0.15
         angles = np.array([0, 2*np.pi/3, 4*np.pi/3])
-        
         sources = np.array([
-            [center[0] + radius * np.cos(angle), 
-             center[1] + radius * np.sin(angle), 
-             center[2] + (i-1) * dimensions[2] * 0.1]
-            for i, angle in enumerate(angles)
+            [center[0] + radius * np.cos(a),
+             center[1] + radius * np.sin(a),
+             center[2] + (i - 1) * dimensions[2] * 0.05]
+            for i, a in enumerate(angles)
         ])
         charges = np.array([1.0, 0.8, -0.6])
-        
-    elif num_sources == 4:
-        # Configuracion distribuida dentro de una region pequena del centro
-        # Usar el centro de la malla como punto de partida
-        # Las fuentes deben estar MUY cerca del centro para asegurar que esten dentro
-        
-        # Radio muy pequeno para mantener fuentes cerca del centro
-        radio = min(dimensions) * 0.05  # 5% de la dimension minima
-        
-        # Distribucion tetraedrica compacta alrededor del centro
-        offsets = np.array([
-            [radio, 0, radio * 0.5],           # Fuente 1: adelante-arriba
-            [-radio, 0, -radio * 0.5],         # Fuente 2: atras-abajo
-            [0, radio, 0],                      # Fuente 3: derecha
-            [0, -radio, radio * 0.3]           # Fuente 4: izquierda-arriba
-        ])
-        
-        sources = center + offsets
-        charges = np.array([1.0, -0.8, 0.6, -0.4])
-        
+
     else:
-        # Para mas fuentes, distribucion aleatoria estratificada
-        np.random.seed(42)  # Para reproducibilidad
-        
-        # Generar fuentes en diferentes regiones
-        sources = []
-        for i in range(num_sources):
-            # Dividir el espacio en regiones
-            region_offset = np.array([
-                (i % 2 - 0.5) * dimensions[0] * 0.4,
-                ((i // 2) % 2 - 0.5) * dimensions[1] * 0.4,
-                ((i // 4) % 2 - 0.5) * dimensions[2] * 0.4
-            ])
-            
-            # Agregar variacion aleatoria pequeña
-            random_offset = np.random.normal(0, 0.1, 3) * dimensions * 0.1
-            
-            source = center + region_offset + random_offset
-            sources.append(source)
-        
-        sources = np.array(sources)
-        
-        # Cargas alternantes con decaimiento
-        charges = np.array([
-            (1.0 if i % 2 == 0 else -0.8) * (0.9 ** (i // 2))
-            for i in range(num_sources)
+        # Distribucion compacta alrededor del centro
+        radio = float(min(dimensions)) * 0.05
+        offsets = np.array([
+            [ radio,  0,      radio * 0.5],
+            [-radio,  0,     -radio * 0.5],
+            [ 0,      radio,  0],
+            [ 0,     -radio,  radio * 0.3],
         ])
-    
+        if num_sources <= 4:
+            sources = center + offsets[:num_sources]
+        else:
+            np.random.seed(42)
+            extra = np.random.normal(0, radio * 0.5, (num_sources - 4, 3))
+            sources = np.vstack([center + offsets, center + extra])
+        charges = _make_charges(num_sources)
+
     return sources, charges
+
+
+def _get_heart_nodes(mesh, mio):
+    """
+    Devuelve coordenadas de nodos que pertenecen al material 2 (corazon).
+    
+    Busca en cell_data_dict los tetraedros con etiqueta 2 y extrae
+    los indices de nodos unicos que los componen.
+    """
+    mat_arr = None
+    if hasattr(mio, 'cell_data_dict'):
+        datos = mio.cell_data_dict
+        if "gmsh:physical" in datos and "tetra" in datos["gmsh:physical"]:
+            mat_arr = datos["gmsh:physical"]["tetra"].flatten().astype(int)
+        else:
+            for _, bloques in datos.items():
+                if "tetra" in bloques:
+                    arr = bloques["tetra"].flatten()
+                    if len(np.unique(arr)) <= 20 and arr.min() >= 0:
+                        mat_arr = arr.astype(int)
+                        break
+
+    if mat_arr is None:
+        return None
+
+    if 2 not in np.unique(mat_arr):
+        return None
+
+    tetraedros = mio.cells_dict.get('tetra')
+    if tetraedros is None:
+        return None
+
+    mascara_corazon = mat_arr == 2
+    nodos_corazon = np.unique(tetraedros[mascara_corazon].ravel())
+    return mesh.p[:, nodos_corazon].T  # shape (N, 3)
+
+
+def _distribute_nodes_spatially(nodes, n):
+    """
+    Selecciona n nodos distribuidos espacialmente usando k-means simplificado.
+    
+    Divide el bounding box del conjunto de nodos en n regiones y elige
+    el nodo mas cercano al centroide de cada region.
+    """
+    if len(nodes) <= n:
+        return nodes
+
+    # Inicializar centroides con k-means++ simplificado
+    np.random.seed(0)
+    indices = [np.random.randint(len(nodes))]
+    for _ in range(n - 1):
+        dists = np.array([min(np.linalg.norm(nodes[i] - nodes[j]) for j in indices)
+                          for i in range(len(nodes))])
+        probs = dists ** 2
+        probs /= probs.sum()
+        indices.append(np.random.choice(len(nodes), p=probs))
+
+    centroids = nodes[indices].copy()
+
+    # Iterar k-means (5 pasos es suficiente)
+    for _ in range(5):
+        dists = np.linalg.norm(nodes[:, None, :] - centroids[None, :, :], axis=2)
+        labels = np.argmin(dists, axis=1)
+        for k in range(n):
+            mask = labels == k
+            if mask.any():
+                centroids[k] = nodes[mask].mean(axis=0)
+
+    # Para cada centroide, elegir el nodo real mas cercano
+    selected = []
+    for c in centroids:
+        idx = np.argmin(np.linalg.norm(nodes - c, axis=1))
+        selected.append(nodes[idx])
+
+    return np.array(selected)
+
+
+def _make_charges(n):
+    """Genera n cargas balanceadas alternantes."""
+    charges = np.array([(1.0 if i % 2 == 0 else -0.8) * (0.9 ** (i // 2))
+                        for i in range(n)])
+    return charges
 
 
 def analyze_mesh_complexity(mesh):
@@ -624,7 +667,7 @@ class ECGAppAuto:
                 analysis = analyze_mesh_complexity(mesh)
                 
                 # Detectar fuentes y cargas automaticamente
-                sources, charges = auto_detect_sources(mesh, analysis['optimal_sources'])
+                sources, charges = auto_detect_sources(mesh, analysis['optimal_sources'], mio=mio)
                 
                 # Guardar parametros automaticos
                 self.auto_sources = sources
@@ -1349,7 +1392,7 @@ Listo para resolucion automatica"""
                 messagebox.showerror("Error", f"Error al iniciar generacion:\n{e}")
         
         # Botones de accion
-        generate_btn = tk.Button(button_frame, text="ADVERTENCIA™ï¸ Generar Modelo", 
+        generate_btn = tk.Button(button_frame, text="Generar Modelo", 
                                 command=generate_and_preview,
                                 font=("Arial", 12, "bold"), bg='#27ae60', fg='white', 
                                 relief=tk.FLAT, padx=40, pady=12, cursor='hand2',
@@ -1877,12 +1920,12 @@ Listo para resolucion automatica"""
                 ax.view_init(elev=25, azim=45)
                 canvas.draw()
             
-            tk.Button(controls_frame, text="ž•", 
+            tk.Button(controls_frame, text="+", 
                      command=zoom_in,
                      font=("Arial", 10, "bold"), bg='#27ae60', fg='white', 
                      relief=tk.FLAT, padx=8, pady=2).pack(side=tk.LEFT, padx=2)
             
-            tk.Button(controls_frame, text="ž–", 
+            tk.Button(controls_frame, text="-", 
                      command=zoom_out,
                      font=("Arial", 10, "bold"), bg='#e67e22', fg='white', 
                      relief=tk.FLAT, padx=8, pady=2).pack(side=tk.LEFT, padx=2)
@@ -1902,7 +1945,7 @@ Listo para resolucion automatica"""
             canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
             print("Dibujando canvas...")
             canvas.draw()
-            print("OK“ Canvas mostrado")
+            print("Canvas mostrado")
             
             # Habilitar rotacion con mouse
             def on_mouse_press(event):
@@ -1959,7 +2002,7 @@ Listo para resolucion automatica"""
                 f"   Controles:\n"
                 f"   Arrastra con el mouse para rotar\n"
                 f"   Rueda del mouse para zoom\n"
-                f"   Botones ž•ž– para zoom fino\n"
+                f"   Botones +- para zoom fino\n"
                 f"   Botones de vista para angulos predefinidos\n\n"
                 f"Cuando estes listo, haz clic en 'Resolver Automaticamente'"
             )
