@@ -10,7 +10,15 @@ Versión: 1.0.0
 
 import sys
 import os
+import logging
 import argparse
+
+# Configurar logging básico para la aplicación
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    datefmt="%H:%M:%S",
+)
 
 # Agregar src al path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
@@ -55,14 +63,15 @@ def run_tests():
 
 
 def run_demo():
-    """Ejecuta la demostración"""
+    """Ejecuta la demostración del solver ECG"""
     try:
+        import sys
         sys.path.insert(0, 'examples')
-        from demo_automatic import main as demo_main
+        from examples.demo_ecg_solver import main as demo_main
         return demo_main()
     except ImportError:
         print("Error: No se puede importar la demostración")
-        print("Verifica que el archivo examples/demo_automatic.py existe")
+        print("Ejecuta directamente: py -3.13 -m examples.demo_ecg_solver")
         return 1
     except Exception as e:
         print(f"Error en demostración: {e}")

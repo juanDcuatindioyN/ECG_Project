@@ -3,18 +3,19 @@
 Módulo de resolución completa del problema directo de ECG
 =========================================================
 
-Este módulo implementa el pipeline completo de 5 pasos para simular
-el problema directo del ECG usando el método de elementos finitos:
+Implementa el pipeline completo de 5 pasos para simular el problema
+directo del ECG usando el método de elementos finitos:
 
-Paso 1: Cargar malla con conductividades heterogéneas
-Paso 2: Ensamblar matriz de rigidez K
-Paso 3: Definir fuentes cardíacas (dipolo equivalente temporal)
-Paso 4: Resolver sistema K·φ = f para cada instante
-Paso 5: Postprocesar potenciales en electrodos (12 derivaciones)
+  Paso 1: Cargar malla con conductividades heterogéneas
+  Paso 2: Ensamblar matriz de rigidez K
+  Paso 3: Definir fuentes cardíacas (dipolo equivalente temporal)
+  Paso 4: Resolver sistema K·φ = f para cada instante
+  Paso 5: Postprocesar potenciales en electrodos (12 derivaciones)
 
 Autor: Proyecto ECG
 """
 
+import logging
 import numpy as np
 import scipy.sparse as sp
 import scipy.sparse.linalg as spla
@@ -22,7 +23,9 @@ from skfem import Basis, ElementTetP1, BilinearForm
 from skfem.element import DiscreteField
 from skfem.helpers import grad, dot
 
-from .nucleo_poisson import load_mesh_skfem, extract_surface_tris
+from .mesh_loader import load_mesh_skfem, extract_surface_tris
+
+logger = logging.getLogger(__name__)
 
 
 # =============================================================
@@ -59,13 +62,8 @@ DEFAULT_DIPOLE_TABLE = np.array([
 TORSO_RADIUS = 0.15   # m
 TORSO_HEIGHT = 0.50   # m
 
-# Posiciones anatómicas de electrodos (en metros)
+# Posiciones precordiales por defecto (en metros)
 DEFAULT_ELECTRODES = {
-    # Extremidades
-    "RA": np.array([-TORSO_RADIUS * 0.9,  0.0,              TORSO_HEIGHT * 0.85]),
-    "LA": np.array([ TORSO_RADIUS * 0.9,  0.0,              TORSO_HEIGHT * 0.85]),
-    "LL": np.array([ TORSO_RADIUS * 0.3,  0.0,              0.05]),
-    # Precordiales
     "V1": np.array([-0.02,               TORSO_RADIUS * 0.95, 0.32]),
     "V2": np.array([ 0.02,               TORSO_RADIUS * 0.95, 0.32]),
     "V3": np.array([ 0.06,               TORSO_RADIUS * 0.90, 0.32]),
@@ -79,20 +77,31 @@ DEFAULT_ELECTRODES = {
 # FUNCIONES AUXILIARES
 # =============================================================
 
-def extract_material_labels(mio, cell_type="tetra"):
+def extract_material_labels(mio, cell_type: str = "tetra") -> np.ndarray:
     """
     Extrae etiquetas de material del objeto meshio.
     Compatible con formatos .msh y .vtk.
+
+    Args:
+        mio: Objeto meshio con la malla.
+        cell_type: Tipo de celda a buscar (por defecto "tetra").
+
+    Returns:
+        Array de enteros con la etiqueta de material por elemento.
+
+    Raises:
+        RuntimeError: Si no se encuentran elementos del tipo indicado o
+                      no se localiza un campo de materiales válido.
     """
     if cell_type not in mio.cells_dict:
         raise RuntimeError(f"No se encontraron elementos '{cell_type}' en la malla")
-    
+
     data = mio.cell_data_dict
-    
+
     # Formato MSH: clave estándar de Gmsh
     if "gmsh:physical" in data and cell_type in data["gmsh:physical"]:
         return data["gmsh:physical"][cell_type].flatten().astype(int)
-    
+
     # Formato VTK: buscar campo con IDs enteros pequeños
     for key, blocks in data.items():
         if cell_type in blocks:
@@ -100,26 +109,52 @@ def extract_material_labels(mio, cell_type="tetra"):
             vals = np.unique(arr)
             if len(vals) <= 20 and arr.min() >= 0:
                 return arr.astype(int)
-    
+
     raise RuntimeError(f"No se encontró campo de materiales para '{cell_type}'")
 
 
-def extract_surface_nodes(mio, surface_tag=10):
+def extract_surface_nodes(mio, surface_tag: int = 10) -> np.ndarray:
     """
-    Extrae nodos de la superficie del torso (tag=10).
+    Extrae nodos de la superficie exterior del torso.
+
+    Intenta primero con triángulos etiquetados (tag=10). Si no los encuentra,
+    usa las caras que aparecen exactamente 1 vez en TODOS los tetraedros del
+    modelo — esas son la superficie exterior real.
+
+    Returns:
+        Array 1D de índices de nodos en la superficie exterior.
     """
-    if "triangle" not in mio.cells_dict:
-        return np.array([], dtype=int)
-    
-    try:
-        tri_labels = extract_material_labels(mio, "triangle")
-        mask = tri_labels == surface_tag
-        if mask.sum() > 0:
-            triangles_surf = mio.cells_dict["triangle"][mask]
-            return np.unique(triangles_surf)
-    except RuntimeError:
-        pass
-    
+    # Intento 1: triángulos con tag explícito
+    if "triangle" in mio.cells_dict:
+        try:
+            tri_labels = extract_material_labels(mio, "triangle")
+            mask = tri_labels == surface_tag
+            if mask.sum() > 0:
+                triangles_surf = mio.cells_dict["triangle"][mask]
+                return np.unique(triangles_surf.ravel()).astype(int)
+        except Exception:
+            pass
+
+    # Intento 2: caras que aparecen 1 vez en el modelo completo = superficie exterior
+    if "tetra" in mio.cells_dict:
+        try:
+            tetras = mio.cells_dict["tetra"]
+            cara_count: dict = {}
+            for tet in tetras:
+                for cara in [
+                    tuple(sorted([tet[0], tet[1], tet[2]])),
+                    tuple(sorted([tet[0], tet[1], tet[3]])),
+                    tuple(sorted([tet[0], tet[2], tet[3]])),
+                    tuple(sorted([tet[1], tet[2], tet[3]])),
+                ]:
+                    cara_count[cara] = cara_count.get(cara, 0) + 1
+
+            caras_ext = [c for c, n in cara_count.items() if n == 1]
+            if caras_ext:
+                return np.unique(np.array(caras_ext).ravel()).astype(int)
+        except Exception:
+            pass
+
     return np.array([], dtype=int)
 
 
@@ -127,48 +162,60 @@ def extract_surface_nodes(mio, surface_tag=10):
 # PASO 1: CARGAR MALLA CON CONDUCTIVIDADES
 # =============================================================
 
-def load_mesh_with_conductivities(vtk_path, conductivities=None):
+def load_mesh_with_conductivities(vtk_path: str, conductivities: dict | None = None) -> dict:
     """
-    Carga malla VTK y asigna conductividades por material.
-    
+    Carga malla VTK/MSH y asigna conductividades por material.
+
     Args:
-        vtk_path: Ruta al archivo VTK/MSH
-        conductivities: Dict {material_id: sigma_S/m}
-        
+        vtk_path: Ruta al archivo VTK o MSH.
+        conductivities: Diccionario ``{material_id: sigma_S/m}``.
+                        Si es None se usan :data:`DEFAULT_CONDUCTIVITIES`.
+
     Returns:
-        dict con: mesh, basis, sigma_el, sigma_field, mat_labels, surface_nodes, mio
+        Diccionario con claves:
+        ``mesh``, ``basis``, ``sigma_el``, ``sigma_field``,
+        ``mat_labels``, ``surface_nodes``, ``mio``.
+
+    Raises:
+        ValueError: Si algún material de la malla no tiene conductividad definida.
+        RuntimeError: Si la malla no contiene tetraedros o etiquetas de material.
     """
     if conductivities is None:
         conductivities = DEFAULT_CONDUCTIVITIES
-    
+
     # Cargar malla
     mesh, mio = load_mesh_skfem(vtk_path)
-    
+
     # Extraer etiquetas de material
     mat_labels = extract_material_labels(mio, "tetra")
-    
+
     # Verificar que todos los materiales tienen conductividad
-    for mid in np.unique(mat_labels):
-        if mid not in conductivities:
-            raise ValueError(
-                f"Material ID {mid} no tiene conductividad definida. "
-                f"Agrégalo al diccionario de conductividades."
-            )
-    
+    missing = [mid for mid in np.unique(mat_labels) if mid not in conductivities]
+    if missing:
+        raise ValueError(
+            f"Los materiales {missing} no tienen conductividad definida. "
+            "Agrégalos al diccionario de conductividades."
+        )
+
     # Conductividad por elemento
     sigma_el = np.array([conductivities[m] for m in mat_labels], dtype=float)
-    
+
     # Base funcional
     basis = Basis(mesh, ElementTetP1())
-    
+
     # DiscreteField para ensamblaje
     n_quad = basis.X.shape[1]
     sigma_qp = np.repeat(sigma_el[:, np.newaxis], n_quad, axis=1)
     sigma_field = DiscreteField(value=sigma_qp)
-    
+
     # Nodos de superficie
     surface_nodes = extract_surface_nodes(mio)
-    
+
+    logger.info(
+        "Malla cargada: %d nodos, %d elementos, %d nodos de superficie",
+        mesh.p.shape[1], mesh.t.shape[1], len(surface_nodes),
+    )
+
     return {
         'mesh': mesh,
         'basis': basis,
@@ -176,7 +223,7 @@ def load_mesh_with_conductivities(vtk_path, conductivities=None):
         'sigma_field': sigma_field,
         'mat_labels': mat_labels,
         'surface_nodes': surface_nodes,
-        'mio': mio
+        'mio': mio,
     }
 
 
@@ -184,23 +231,26 @@ def load_mesh_with_conductivities(vtk_path, conductivities=None):
 # PASO 2: ENSAMBLAR MATRIZ DE RIGIDEZ
 # =============================================================
 
-def assemble_stiffness_matrix(basis, sigma_field):
+def assemble_stiffness_matrix(basis, sigma_field) -> sp.csr_matrix:
     """
     Ensambla la matriz de rigidez K para el problema de Poisson
     con conductividades heterogéneas.
-    
+
+    Forma bilineal: a(u,v) = ∫_Ω σ ∇u · ∇v dV
+
     Args:
-        basis: Base funcional de scikit-fem
-        sigma_field: Campo de conductividades
-        
+        basis: Base funcional de scikit-fem.
+        sigma_field: Campo de conductividades (DiscreteField).
+
     Returns:
-        Matriz K en formato CSR
+        Matriz K dispersa en formato CSR.
     """
     @BilinearForm
     def bilinear_form(u, v, w):
         return w.sigma * dot(grad(u), grad(v))
-    
+
     K = bilinear_form.assemble(basis, sigma=sigma_field)
+    logger.debug("Matriz K ensamblada: %dx%d, nnz=%d", K.shape[0], K.shape[1], K.nnz)
     return K.tocsr()
 
 
@@ -277,70 +327,71 @@ def compute_p1_gradients(mesh, element_idx):
     return grads
 
 
-def build_source_vector(mesh, dipole_pos, dipole_moment):
+def build_source_vector(mesh, dipole_pos: np.ndarray, dipole_moment: np.ndarray) -> np.ndarray:
     """
     Construye el vector de fuentes f para un dipolo puntual.
-    
-    f_i = p · grad(phi_i)(r0)
-    
+
+    f_i = p · grad(φ_i)(r0)
+
     Args:
-        mesh: Malla scikit-fem
-        dipole_pos: Posición del dipolo (3,)
-        dipole_moment: Momento dipolar p = (px, py, pz) en A·m
-        
+        mesh: Malla scikit-fem.
+        dipole_pos: Posición del dipolo, shape (3,).
+        dipole_moment: Momento dipolar p = (px, py, pz) en A·m.
+
     Returns:
-        Vector f de shape (N,)
+        Vector f de shape (N,).
+
+    Raises:
+        ValueError: Si el dipolo no está dentro de ningún elemento.
     """
     N = mesh.p.shape[1]
     f = np.zeros(N)
-    
-    elem_idx, bary = find_element_containing_point(mesh, dipole_pos)
-    
+
+    elem_idx, _ = find_element_containing_point(mesh, dipole_pos)
+
     if elem_idx == -1:
         raise ValueError(
             f"El dipolo en {dipole_pos} no está dentro de ningún elemento. "
             "Verifica que la posición esté dentro del dominio."
         )
-    
-    # Gradientes de funciones de forma
+
     grads = compute_p1_gradients(mesh, elem_idx)
-    
-    # Nodos del elemento
     nodes = mesh.t.T[elem_idx]
-    
-    # f_i = p · grad(phi_i) para los 4 nodos
+
     for local_i, global_i in enumerate(nodes):
         f[global_i] = np.dot(dipole_moment, grads[local_i])
-    
+
     return f
 
 
-def build_source_matrix(mesh, dipole_pos, dipole_table):
+def build_source_matrix(mesh, dipole_pos: np.ndarray, dipole_table: np.ndarray) -> dict:
     """
-    Construye matriz de fuentes F para todos los instantes del ciclo cardíaco.
-    
+    Construye la matriz de fuentes F para todos los instantes del ciclo cardíaco.
+
     Args:
-        mesh: Malla scikit-fem
-        dipole_pos: Posición del dipolo
-        dipole_table: Array (T, 4) con [t, px, py, pz] por fila
-        
+        mesh: Malla scikit-fem.
+        dipole_pos: Posición del dipolo, shape (3,).
+        dipole_table: Array (T, 4) con columnas [t, px, py, pz].
+
     Returns:
-        dict con: F_matrix (N, T), times (T,), dipoles (T, 3)
+        Diccionario con:
+        ``F_matrix`` (N, T), ``times`` (T,), ``dipoles`` (T, 3).
     """
     times = dipole_table[:, 0]
     dipoles = dipole_table[:, 1:]
-    
+
     N = mesh.p.shape[1]
     T = len(times)
     F_matrix = np.zeros((N, T))
-    
+
     for i, dipole_moment in enumerate(dipoles):
         F_matrix[:, i] = build_source_vector(mesh, dipole_pos, dipole_moment)
-    
+
+    logger.debug("Matriz de fuentes F construida: %dx%d", N, T)
     return {
         'F_matrix': F_matrix,
         'times': times,
-        'dipoles': dipoles
+        'dipoles': dipoles,
     }
 
 
@@ -386,81 +437,124 @@ def apply_gauge_condition(K, F, ref_node):
     return K_red, F_red, mask
 
 
-def solve_single_instant(K_red, f_col, mask, ref_node, N, tol=1e-8, max_iter=5000):
+def solve_single_instant(
+    K_red: sp.csr_matrix,
+    f_col: np.ndarray,
+    mask: np.ndarray,
+    ref_node: int,
+    N: int,
+    tol: float = 1e-8,
+    max_iter: int = 5000,
+) -> tuple[np.ndarray, float, int]:
     """
     Resuelve K_red·phi_red = f_col usando MINRES con precondicionador Jacobi.
-    
+
+    La tolerancia se ajusta automáticamente si el sistema es grande para
+    evitar tiempos de cómputo excesivos.
+
+    Args:
+        K_red: Matriz de rigidez reducida (sin fila/columna del nodo de referencia).
+        f_col: Vector de fuentes reducido.
+        mask: Máscara booleana que indica los DOF activos.
+        ref_node: Índice del nodo de referencia (phi=0).
+        N: Número total de nodos.
+        tol: Tolerancia relativa del solver.
+        max_iter: Número máximo de iteraciones.
+
     Returns:
-        phi_full (N,), residual, solver_info
+        Tupla ``(phi_full, residual, info)`` donde:
+        - ``phi_full``: Potencial en todos los nodos, shape (N,).
+        - ``residual``: Residuo relativo ||K·x - f|| / ||f||.
+        - ``info``: Código de retorno de MINRES (0 = convergió).
     """
-    # Precondicionador diagonal
+    # Ajuste adaptativo de tolerancia para mallas grandes
+    n_dof = K_red.shape[0]
+    effective_tol = max(tol, 1e-6 * (n_dof / 10_000) ** 0.5) if n_dof > 10_000 else tol
+
+    # Precondicionador diagonal (Jacobi)
     diag = K_red.diagonal()
     diag = np.where(np.abs(diag) > 1e-15, diag, 1.0)
     M_prec = sp.diags(1.0 / diag)
-    
-    # Resolver
-    phi_red, info = spla.minres(K_red, f_col, M=M_prec, rtol=tol, maxiter=max_iter)
-    
+
+    phi_red, info = spla.minres(K_red, f_col, M=M_prec, rtol=effective_tol, maxiter=max_iter)
+
+    if info != 0:
+        logger.warning("MINRES no convergió (info=%d, tol=%.2e, iter=%d)", info, effective_tol, max_iter)
+
     # Reconstruir phi completo
     phi_full = np.zeros(N)
     phi_full[mask] = phi_red
-    
-    # Calcular residuo
-    residual = np.linalg.norm(K_red @ phi_red - f_col) / (np.linalg.norm(f_col) + 1e-30)
-    
+
+    # Residuo relativo
+    f_norm = np.linalg.norm(f_col)
+    residual = np.linalg.norm(K_red @ phi_red - f_col) / (f_norm + 1e-30)
+
     return phi_full, residual, info
 
 
-def solve_ecg_system(K, F_matrix, mesh, surface_nodes, dipole_pos, 
-                     tol=1e-8, max_iter=5000):
+def solve_ecg_system(
+    K: sp.csr_matrix,
+    F_matrix: np.ndarray,
+    mesh,
+    surface_nodes: np.ndarray,
+    dipole_pos: np.ndarray,
+    tol: float = 1e-8,
+    max_iter: int = 5000,
+) -> dict:
     """
-    Resuelve el sistema K·φ = f para todos los instantes.
-    
+    Resuelve el sistema K·φ = f para todos los instantes temporales.
+
     Args:
-        K: Matriz de rigidez
-        F_matrix: Matriz de fuentes (N, T)
-        mesh: Malla
-        surface_nodes: Nodos de superficie
-        dipole_pos: Posición del dipolo
-        tol: Tolerancia del solver
-        max_iter: Máximo de iteraciones
-        
+        K: Matriz de rigidez CSR.
+        F_matrix: Matriz de fuentes, shape (N, T).
+        mesh: Malla scikit-fem.
+        surface_nodes: Índices de nodos en la superficie del torso.
+        dipole_pos: Posición del dipolo cardíaco.
+        tol: Tolerancia del solver iterativo.
+        max_iter: Máximo de iteraciones por instante.
+
     Returns:
-        dict con: PHI (N, T), ref_node, residuals (T,)
+        Diccionario con:
+        ``PHI`` (N, T), ``ref_node``, ``ref_origin``, ``residuals`` (T,),
+        ``n_converged`` (número de instantes que convergieron).
     """
     N = mesh.p.shape[1]
     T = F_matrix.shape[1]
-    
-    # Nodo de referencia
+
     ref_node, origin = select_reference_node(mesh, surface_nodes, dipole_pos)
-    
-    # Aplicar condición de gauge
     K_red, F_red, mask = apply_gauge_condition(K, F_matrix, ref_node)
-    
-    # Resolver para cada instante
+
     PHI = np.zeros((N, T))
     residuals = np.zeros(T)
-    
+    n_converged = 0
+
     for i in range(T):
         f_col = F_red[:, i]
-        
-        # Si dipolo es nulo, phi = 0
+
         if np.linalg.norm(f_col) < 1e-20:
             PHI[:, i] = 0.0
-            residuals[i] = 0.0
+            n_converged += 1
             continue
-        
+
         phi_i, res_i, info_i = solve_single_instant(
             K_red, f_col, mask, ref_node, N, tol, max_iter
         )
         PHI[:, i] = phi_i
         residuals[i] = res_i
-    
+        if info_i == 0:
+            n_converged += 1
+
+    logger.info(
+        "Sistema resuelto: %d/%d instantes convergieron, residuo máx=%.2e",
+        n_converged, T, residuals.max(),
+    )
+
     return {
         'PHI': PHI,
         'ref_node': ref_node,
         'ref_origin': origin,
-        'residuals': residuals
+        'residuals': residuals,
+        'n_converged': n_converged,
     }
 
 
@@ -468,15 +562,18 @@ def solve_ecg_system(K, F_matrix, mesh, surface_nodes, dipole_pos,
 # PASO 5: POSTPROCESAR POTENCIALES EN ELECTRODOS
 # =============================================================
 
-def find_closest_node_on_surface(mesh, surface_nodes, position):
+def find_closest_node_on_surface(mesh, surface_nodes: np.ndarray, position: np.ndarray) -> int:
     """
     Encuentra el nodo de superficie más cercano a la posición dada.
+
+    Siempre busca dentro de surface_nodes. Si está vacío lanza un error
+    en lugar de buscar en nodos internos.
     """
     if len(surface_nodes) == 0:
-        # Fallback: buscar en toda la malla
-        distances = np.linalg.norm(mesh.p.T - position, axis=1)
-        return int(np.argmin(distances))
-    
+        raise ValueError(
+            "surface_nodes está vacío — no se puede localizar el electrodo en la superficie. "
+            "Verifica que la malla tenga etiquetas de superficie (tag=10) o tetraedros del torso (material 1)."
+        )
     coords = mesh.p.T[surface_nodes]
     distances = np.linalg.norm(coords - position, axis=1)
     return int(surface_nodes[np.argmin(distances)])
@@ -500,36 +597,22 @@ def locate_electrodes(mesh, surface_nodes, electrode_positions=None):
     return electrode_nodes
 
 
-def compute_12_lead_ecg(phi_electrodes):
+def compute_12_lead_ecg(phi_electrodes: dict) -> dict:
     """
-    Calcula las 12 derivaciones estándar del ECG.
-    
+    Calcula derivaciones ECG a partir de los electrodos disponibles.
+
+    Solo usa los electrodos precordiales (V1–V6) que estén presentes.
+    No requiere RA, LA ni LL.
+
     Args:
-        phi_electrodes: dict {electrode_name: potential_array}
-        
+        phi_electrodes: dict {nombre_electrodo: array_potencial}
+
     Returns:
-        dict con las 12 derivaciones
+        dict con una derivación por cada electrodo presente.
     """
-    RA = phi_electrodes["RA"]
-    LA = phi_electrodes["LA"]
-    LL = phi_electrodes["LL"]
-    WCT = (RA + LA + LL) / 3.0  # Wilson Central Terminal
-    
-    leads = {
-        "I":   LA - RA,
-        "II":  LL - RA,
-        "III": LL - LA,
-        "aVR": RA - WCT,
-        "aVL": LA - WCT,
-        "aVF": LL - WCT,
-        "V1":  phi_electrodes["V1"] - WCT,
-        "V2":  phi_electrodes["V2"] - WCT,
-        "V3":  phi_electrodes["V3"] - WCT,
-        "V4":  phi_electrodes["V4"] - WCT,
-        "V5":  phi_electrodes["V5"] - WCT,
-        "V6":  phi_electrodes["V6"] - WCT,
-    }
-    
+    leads = {}
+    for name, signal in phi_electrodes.items():
+        leads[name] = signal
     return leads
 
 
@@ -567,208 +650,11 @@ def postprocess_ecg(mesh, surface_nodes, PHI, electrode_positions=None):
 
 def plot_electrodes_on_torso(mesh, mio, electrode_nodes, surface_nodes,
                               PHI=None, instant_idx=4,
-                              output_file="electrodos_torso.png"):
-    """
-    Visualiza los electrodos del ECG sobre la superficie 3D del torso.
-
-    Muestra el torso con materiales semitransparentes (torso, corazón,
-    pulmones) y marca los 9 electrodos (RA, LA, LL, V1-V6) como puntos
-    de colores sobre la superficie, con etiquetas y líneas de proyección.
-
-    Opcionalmente colorea la superficie con el mapa de potenciales del
-    instante indicado.
-
-    Args:
-        mesh: MeshTet de scikit-fem
-        mio: Objeto meshio con datos de materiales
-        electrode_nodes: dict {nombre: indice_nodo} de locate_electrodes()
-        surface_nodes: array de indices de nodos en la superficie
-        PHI: Potenciales (N, T), opcional — si se pasa colorea la superficie
-        instant_idx: Instante a mostrar en el mapa de potenciales (default 4 = pico QRS)
-        output_file: Ruta del archivo PNG de salida
-
-    Returns:
-        matplotlib.figure.Figure
-    """
-    import matplotlib
-    import matplotlib.pyplot as plt
-    import matplotlib.patches as mpatches
-    from matplotlib.figure import Figure
-    from mpl_toolkits.mplot3d.art3d import Poly3DCollection
-    from matplotlib.colors import to_rgba, Normalize
-    from matplotlib.cm import ScalarMappable
-    from collections import Counter
-
-    # --- Colores por tipo de electrodo ---
-    COLORES_ELECTRODO = {
-        "RA": ("#E74C3C", "^"),   # rojo, triángulo
-        "LA": ("#E74C3C", "^"),
-        "LL": ("#E74C3C", "^"),
-        "V1": ("#2980B9", "o"),   # azul, círculo
-        "V2": ("#2980B9", "o"),
-        "V3": ("#2980B9", "o"),
-        "V4": ("#2980B9", "o"),
-        "V5": ("#2980B9", "o"),
-        "V6": ("#2980B9", "o"),
-    }
-
-    # --- Colores de materiales (semitransparentes para ver electrodos) ---
-    MAT_CONFIG = {
-        1: ('#5DADE2', 'Torso',      0.10),
-        2: ('#E74C3C', 'Corazon',    0.35),
-        3: ('#F39C12', 'Pulmon izq', 0.25),
-        4: ('#2ECC71', 'Pulmon der', 0.25),
-    }
-
-    X = mesh.p.T  # (N, 3)
-
-    fig = Figure(figsize=(14, 6))
-    fig.suptitle("Electrodos ECG sobre la superficie del torso",
-                 fontsize=13, fontweight="bold")
-
-    # ---- Panel izquierdo: vista 3D con materiales ----
-    ax3d = fig.add_subplot(121, projection='3d')
-
-    # Extraer etiquetas de material
-    mat_labels = None
-    if hasattr(mio, 'cell_data_dict'):
-        datos = mio.cell_data_dict
-        if "gmsh:physical" in datos and "tetra" in datos["gmsh:physical"]:
-            mat_labels = datos["gmsh:physical"]["tetra"].flatten().astype(int)
-        else:
-            for clave, bloques in datos.items():
-                if "tetra" in bloques:
-                    arr = bloques["tetra"].flatten()
-                    if len(np.unique(arr)) <= 20 and arr.min() >= 0:
-                        mat_labels = arr.astype(int)
-                        break
-
-    # Dibujar superficies por material
-    legend_handles = []
-    if mat_labels is not None and "tetra" in mio.cells_dict:
-        tetras = mio.cells_dict["tetra"]
-        for mat_id in [4, 3, 2, 1]:
-            if mat_id not in MAT_CONFIG:
-                continue
-            if mat_id not in np.unique(mat_labels):
-                continue
-            color, nombre, alfa = MAT_CONFIG[mat_id]
-            mask_mat = mat_labels == mat_id
-            tets_mat = tetras[mask_mat]
-
-            # Extraer caras de superficie (aparecen solo 1 vez)
-            caras = []
-            for tet in tets_mat:
-                caras += [
-                    tuple(sorted([tet[0], tet[1], tet[2]])),
-                    tuple(sorted([tet[0], tet[1], tet[3]])),
-                    tuple(sorted([tet[0], tet[2], tet[3]])),
-                    tuple(sorted([tet[1], tet[2], tet[3]])),
-                ]
-            conteo = Counter(caras)
-            sup = [c for c, n in conteo.items() if n == 1]
-            if not sup:
-                continue
-
-            sup_arr = np.array(sup)
-            # Submuestreo para rendimiento
-            max_tris = {1: 300, 2: 400, 3: 300, 4: 300}.get(mat_id, 300)
-            if len(sup_arr) > max_tris:
-                idx = np.linspace(0, len(sup_arr) - 1, max_tris, dtype=int)
-                sup_arr = sup_arr[idx]
-
-            verts = [[X[t[0]], X[t[1]], X[t[2]]] for t in sup_arr]
-            col = Poly3DCollection(verts,
-                                   facecolors=to_rgba(color, alfa),
-                                   edgecolors='gray',
-                                   linewidths=0.1,
-                                   shade=False, antialiased=False)
-            ax3d.add_collection3d(col)
-            legend_handles.append(
-                mpatches.Patch(color=color, alpha=max(alfa, 0.5), label=nombre))
-
-    # Dibujar electrodos sobre la superficie
-    centro = X.mean(axis=0)
-    plotted_colors = {}
-    for nombre, nodo in electrode_nodes.items():
-        pos = X[nodo]
-        color_e, marker_e = COLORES_ELECTRODO.get(nombre, ("#8E44AD", "s"))
-
-        # Línea de proyección hacia afuera
-        dir_out = pos - centro
-        dir_out = dir_out / (np.linalg.norm(dir_out) + 1e-10)
-        p_ext = pos + dir_out * 0.025
-        ax3d.plot([pos[0], p_ext[0]], [pos[1], p_ext[1]], [pos[2], p_ext[2]],
-                  color=color_e, linewidth=1.2, alpha=0.7, linestyle='--')
-
-        # Punto del electrodo
-        ax3d.scatter(*pos, s=120, c=color_e, marker=marker_e,
-                     edgecolors='black', linewidth=0.8, zorder=1000, alpha=1.0)
-
-        # Etiqueta
-        ax3d.text(p_ext[0], p_ext[1], p_ext[2], f" {nombre}",
-                  fontsize=7, color=color_e, fontweight='bold', zorder=1001)
-
-        if color_e not in plotted_colors:
-            label = "Extremidades (RA,LA,LL)" if color_e == "#E74C3C" else "Precordiales (V1-V6)"
-            legend_handles.append(
-                mpatches.Patch(color=color_e, alpha=1.0, label=label))
-            plotted_colors[color_e] = True
-
-    ax3d.set_xlim(X[:, 0].min(), X[:, 0].max())
-    ax3d.set_ylim(X[:, 1].min(), X[:, 1].max())
-    ax3d.set_zlim(X[:, 2].min(), X[:, 2].max())
-    ax3d.set_xlabel("X (m)", fontsize=8)
-    ax3d.set_ylabel("Y (m)", fontsize=8)
-    ax3d.set_zlabel("Z (m)", fontsize=8)
-    ax3d.set_title("Vista 3D", fontsize=10, fontweight='bold')
-    ax3d.view_init(elev=20, azim=45)
-    ax3d.set_box_aspect([1, 1, 1])
-    ax3d.grid(False)
-    ax3d.xaxis.pane.fill = False
-    ax3d.yaxis.pane.fill = False
-    ax3d.zaxis.pane.fill = False
-    ax3d.legend(handles=legend_handles, loc='upper right', fontsize=7,
-                framealpha=0.9, ncol=1)
-
-    # ---- Panel derecho: mapa 2D frontal (XZ) con electrodos ----
-    ax2d = fig.add_subplot(122)
-
-    if len(surface_nodes) > 0:
-        coords_sup = X[surface_nodes]
-        if PHI is not None:
-            phi_sup = PHI[surface_nodes, instant_idx] * 1000  # mV
-            vmax = np.abs(phi_sup).max() or 1.0
-            sc = ax2d.scatter(coords_sup[:, 0], coords_sup[:, 2],
-                              c=phi_sup, cmap="RdBu_r", s=6,
-                              vmin=-vmax, vmax=vmax, alpha=0.7)
-            fig.colorbar(sc, ax=ax2d, label="Potencial (mV)", shrink=0.8)
-            ax2d.set_title(f"Vista frontal XZ — t={instant_idx} (pico QRS)", fontsize=10)
-        else:
-            ax2d.scatter(coords_sup[:, 0], coords_sup[:, 2],
-                         c='#5DADE2', s=6, alpha=0.4)
-            ax2d.set_title("Vista frontal XZ — superficie del torso", fontsize=10)
-
-    # Marcar electrodos en la vista 2D
-    for nombre, nodo in electrode_nodes.items():
-        pos = X[nodo]
-        color_e, marker_e = COLORES_ELECTRODO.get(nombre, ("#8E44AD", "s"))
-        ax2d.scatter(pos[0], pos[2], s=120, c=color_e,
-                     marker=marker_e, edgecolors='black',
-                     linewidth=0.8, zorder=10, alpha=1.0)
-        ax2d.annotate(nombre, (pos[0], pos[2]),
-                      textcoords="offset points", xytext=(5, 4),
-                      fontsize=7, color=color_e, fontweight='bold')
-
-    ax2d.set_xlabel("x (m)", fontsize=9)
-    ax2d.set_ylabel("z (m)", fontsize=9)
-    ax2d.set_aspect("equal")
-    ax2d.grid(True, linestyle="--", alpha=0.3)
-
-    fig.tight_layout()
-    fig.savefig(output_file, dpi=150, bbox_inches="tight")
-    print(f"  Figura guardada: {output_file}")
-    return fig
+                              output_file="output/electrodos_torso.png"):
+    """Alias — implementacion en src/visualization/viewer3d.py."""
+    from ..visualization.viewer3d import plot_electrodes_on_torso as _plot
+    return _plot(mesh, mio, electrode_nodes, surface_nodes,
+                 PHI=PHI, instant_idx=instant_idx, output_file=output_file)
 
 
 # =============================================================
@@ -805,32 +691,48 @@ class ECGSolver:
         self.solution_data = None
         self.ecg_data = None
     
-    def run_full_pipeline(self, tol=1e-8, max_iter=5000):
+    def run_full_pipeline(self, tol: float = 1e-8, max_iter: int = 5000) -> dict:
         """
         Ejecuta el pipeline completo de 5 pasos.
-        
+
+        Args:
+            tol: Tolerancia del solver iterativo.
+            max_iter: Máximo de iteraciones por instante temporal.
+
         Returns:
-            dict con todos los resultados
+            Diccionario con todos los resultados del pipeline.
+
+        Raises:
+            ValueError: Si la malla no contiene los materiales requeridos o
+                        el dipolo está fuera del dominio.
+            RuntimeError: Si la malla no tiene el formato esperado.
         """
+        logger.info("Iniciando pipeline ECG completo para: %s", self.vtk_path)
+
         # Paso 1: Cargar malla
+        logger.info("Paso 1: Cargando malla con conductividades...")
         self.mesh_data = load_mesh_with_conductivities(
             self.vtk_path, self.conductivities
         )
-        
+
         # Paso 2: Ensamblar K
+        logger.info("Paso 2: Ensamblando matriz de rigidez K...")
         self.K = assemble_stiffness_matrix(
             self.mesh_data['basis'],
             self.mesh_data['sigma_field']
         )
-        
+
         # Paso 3: Fuentes cardíacas
+        logger.info("Paso 3: Construyendo fuentes cardíacas...")
         self.source_data = build_source_matrix(
             self.mesh_data['mesh'],
             self.dipole_pos,
             self.dipole_table
         )
-        
+
         # Paso 4: Resolver sistema
+        logger.info("Paso 4: Resolviendo sistema K·φ = f (%d instantes)...",
+                    self.source_data['F_matrix'].shape[1])
         self.solution_data = solve_ecg_system(
             self.K,
             self.source_data['F_matrix'],
@@ -840,15 +742,17 @@ class ECGSolver:
             tol,
             max_iter
         )
-        
+
         # Paso 5: Postprocesar ECG
+        logger.info("Paso 5: Postprocesando potenciales en electrodos...")
         self.ecg_data = postprocess_ecg(
             self.mesh_data['mesh'],
             self.mesh_data['surface_nodes'],
             self.solution_data['PHI'],
             self.electrode_positions
         )
-        
+
+        logger.info("Pipeline completado exitosamente.")
         return self.get_results()
     
     def get_results(self):

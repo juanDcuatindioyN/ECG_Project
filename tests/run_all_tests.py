@@ -26,9 +26,11 @@ def test_project_structure():
     required_dirs = ['src', 'tests', 'examples', 'docs', 'data']
     required_files = [
         'src/__init__.py',
-        'src/nucleo_poisson.py',
-        'src/solucionador_ecg.py',
-        'src/interfaz_grafica_legacy.py',
+        'src/app.py',
+        'src/core/mesh_loader.py',
+        'src/core/ecg_solver.py',
+        'src/generation/mesh_generator.py',
+        'src/visualization/viewer3d.py',
         'main.py',
         'README.md',
         'requirements.txt'

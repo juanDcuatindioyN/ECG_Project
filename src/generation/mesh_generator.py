@@ -4,20 +4,23 @@ Generador automático de modelo de torso para ECG
 ================================================
 
 Genera modelos 3D de torso con corazón y opcionalmente pulmones
-usando Gmsh. Incluye vista previa antes de generar la malla.
+usando Gmsh.
 
 Autor: Proyecto ECG
 """
 
+import logging
 import numpy as np
 import os
+
+logger = logging.getLogger(__name__)
 
 try:
     import gmsh
     HAS_GMSH = True
 except ImportError:
     HAS_GMSH = False
-    print("Advertencia: gmsh no está instalado. Instala con: pip install gmsh")
+    logger.warning("gmsh no está instalado. Instala con: pip install gmsh")
 
 
 # Parámetros geométricos por defecto (en metros)
@@ -154,91 +157,93 @@ def create_geometry(include_lungs=True, params=None):
     return result
 
 
-def generate_mesh(include_lungs=True, output_path=None, params=None, show_gui=False):
+def generate_mesh(include_lungs: bool = True, output_path: str | None = None,
+                  params: dict | None = None, show_gui: bool = False) -> str:
     """
-    Genera la malla completa del modelo.
-    
+    Genera la malla completa del modelo de torso.
+
     Args:
-        include_lungs: Si True, incluye pulmones
-        output_path: Ruta donde guardar la malla (si None, usa nombre por defecto)
-        params: Diccionario con parámetros geométricos
-        show_gui: Si True, muestra la GUI de Gmsh
-        
+        include_lungs: Si True, incluye pulmones en el modelo.
+        output_path: Ruta donde guardar la malla. Si es None se usa un nombre
+                     por defecto en el directorio actual.
+        params: Parámetros geométricos. Si es None se usan :data:`DEFAULT_PARAMS`.
+        show_gui: Si True, abre la GUI de Gmsh al finalizar.
+
     Returns:
-        str: Ruta del archivo generado
+        Ruta del archivo ``.msh`` generado.
+
+    Raises:
+        ImportError: Si gmsh no está instalado.
     """
     if not HAS_GMSH:
         raise ImportError("gmsh no está instalado. Instala con: pip install gmsh")
-    
+
     if params is None:
         params = DEFAULT_PARAMS
-    
+
     # Crear geometría
     model_info = create_geometry(include_lungs, params)
-    
+
     # Asignar Physical Groups
     gmsh.model.addPhysicalGroup(3, [model_info['torso_vol']], tag=1)
     gmsh.model.addPhysicalGroup(3, [model_info['corazon_vol']], tag=2)
     gmsh.model.setPhysicalName(3, 1, "Torso")
     gmsh.model.setPhysicalName(3, 2, "Corazon")
-    
+
     if include_lungs:
         gmsh.model.addPhysicalGroup(3, [model_info['pulmon_izq_vol']], tag=3)
         gmsh.model.addPhysicalGroup(3, [model_info['pulmon_der_vol']], tag=4)
         gmsh.model.setPhysicalName(3, 3, "PulmonIzquierdo")
         gmsh.model.setPhysicalName(3, 4, "PulmonDerecho")
-    
+
     # Superficie exterior del torso
     surfs_torso = gmsh.model.getBoundary([(3, model_info['torso_vol'])], oriented=False)
     surf_tags = [abs(s[1]) for s in surfs_torso]
     gmsh.model.addPhysicalGroup(2, surf_tags, tag=10)
     gmsh.model.setPhysicalName(2, 10, "SuperficieTorso")
-    
+
     # Refinamiento adaptativo
     gmsh.option.setNumber("Mesh.CharacteristicLengthMax", params['lc_torso'])
     gmsh.option.setNumber("Mesh.CharacteristicLengthMin", params['lc_organo'])
-    
+
     def get_surfs(vol_tag):
         bnd = gmsh.model.getBoundary([(3, vol_tag)], oriented=False)
         return [abs(b[1]) for b in bnd]
-    
+
     organo_surfs = get_surfs(model_info['corazon_vol'])
     if include_lungs:
         organo_surfs += get_surfs(model_info['pulmon_izq_vol'])
         organo_surfs += get_surfs(model_info['pulmon_der_vol'])
-    
+
     field_dist = gmsh.model.mesh.field.add("Distance")
     gmsh.model.mesh.field.setNumbers(field_dist, "SurfacesList", organo_surfs)
-    
+
     field_thresh = gmsh.model.mesh.field.add("Threshold")
     gmsh.model.mesh.field.setNumber(field_thresh, "InField", field_dist)
     gmsh.model.mesh.field.setNumber(field_thresh, "SizeMin", params['lc_organo'])
     gmsh.model.mesh.field.setNumber(field_thresh, "SizeMax", params['lc_torso'])
     gmsh.model.mesh.field.setNumber(field_thresh, "DistMin", 0.02)
     gmsh.model.mesh.field.setNumber(field_thresh, "DistMax", 0.08)
-    
+
     gmsh.model.mesh.field.setAsBackgroundMesh(field_thresh)
     gmsh.option.setNumber("Mesh.Algorithm3D", 1)
-    
+
     # Generar malla
-    print("Generando malla 3D...")
+    logger.info("Generando malla 3D...")
     gmsh.model.mesh.generate(3)
-    
+
     # Determinar nombre de archivo
     if output_path is None:
         suffix = "_con_pulmones" if include_lungs else "_sin_pulmones"
         output_path = f"ecg_torso_auto{suffix}.msh"
-    
-    # Guardar
+
     gmsh.write(output_path)
-    print(f"Malla guardada en: {output_path}")
-    
-    # Mostrar GUI si se solicita
+    logger.info("Malla guardada en: %s", output_path)
+
     if show_gui:
         gmsh.fltk.run()
-    
+
     gmsh.finalize()
-    
     return output_path
 
 

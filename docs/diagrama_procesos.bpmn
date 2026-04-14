@@ -1,0 +1,292 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" id="ecg-bpmn" targetNamespace="http://ecg-simulator" exporter="Camunda Modeler" exporterVersion="5.45.0">
+  <collaboration id="collab1">
+    <participant id="pool1" name="Simulacion del Problema Directo del ECG con FEM" processRef="proc1" />
+    <textAnnotation id="ann1">
+      <text>Formatos soportados:
+.vtk  .msh  .stl  .obj  .ply</text>
+    </textAnnotation>
+    <textAnnotation id="ann2">
+      <text>Conductividades (S/m):
+Torso = 0.22
+Corazon = 0.40
+Pulmones = 0.05</text>
+    </textAnnotation>
+    <association id="as2" sourceRef="ann2" targetRef="t2" />
+    <textAnnotation id="ann3">
+      <text>Dipolo equivalente:
+f_i = p(t) · grad(phi_i)(r0)
+10 instantes del ciclo cardiaco</text>
+    </textAnnotation>
+    <association id="as3" sourceRef="ann3" targetRef="t4" />
+    <textAnnotation id="ann4">
+      <text>Solver iterativo MINRES
+Precondicionador: Jacobi diagonal
+Tolerancia: 1e-8</text>
+    </textAnnotation>
+    <association id="as4" sourceRef="ann4" targetRef="t6" />
+    <textAnnotation id="ann5">
+      <text>Salidas:
+- Senales ECG por electrodo
+- Mapa de potenciales XZ / XY
+- Archivos PNG en output/</text>
+    </textAnnotation>
+    <association id="as5" sourceRef="ann5" targetRef="t10" />
+    <association id="as1" sourceRef="ann1" targetRef="t1" />
+  </collaboration>
+  <process id="proc1" isExecutable="false">
+    <laneSet id="ls1">
+      <lane id="l_sys" name="Sistema (Prototipo ECG-FEM)">
+        <flowNodeRef>end_err</flowNodeRef>
+        <flowNodeRef>end_ok</flowNodeRef>
+        <flowNodeRef>t2</flowNodeRef>
+        <flowNodeRef>t4</flowNodeRef>
+        <flowNodeRef>t6</flowNodeRef>
+        <flowNodeRef>t8</flowNodeRef>
+        <flowNodeRef>t9</flowNodeRef>
+        <flowNodeRef>t10</flowNodeRef>
+        <flowNodeRef>gw1</flowNodeRef>
+      </lane>
+      <lane id="l_user" name="Usuario">
+        <flowNodeRef>start</flowNodeRef>
+        <flowNodeRef>t3</flowNodeRef>
+        <flowNodeRef>t5</flowNodeRef>
+        <flowNodeRef>t7</flowNodeRef>
+        <flowNodeRef>t1</flowNodeRef>
+      </lane>
+    </laneSet>
+    <startEvent id="start" name="Inicio">
+      <outgoing>f01</outgoing>
+    </startEvent>
+    <endEvent id="end_err" name="Proceso&#10;terminado&#10;(malla invalida)">
+      <incoming>f_no</incoming>
+      <errorEventDefinition id="err_def" />
+    </endEvent>
+    <endEvent id="end_ok" name="Fin">
+      <incoming>f11</incoming>
+    </endEvent>
+    <userTask id="t3" name="Definir posicion del&#10;dipolo cardiaco (X,Y,Z)">
+      <incoming>f03</incoming>
+      <outgoing>f04</outgoing>
+    </userTask>
+    <userTask id="t5" name="Ubicar electrodos V1-V6&#10;en la superficie del torso">
+      <incoming>f05</incoming>
+      <outgoing>f06</outgoing>
+    </userTask>
+    <userTask id="t7" name="Confirmar parametros&#10;e iniciar simulacion">
+      <incoming>f07</incoming>
+      <outgoing>f08</outgoing>
+    </userTask>
+    <serviceTask id="t2" name="Validar malla y asignar&#10;conductividades por tejido&#10;(torso, corazon, pulmones)">
+      <incoming>f_si</incoming>
+      <outgoing>f03</outgoing>
+    </serviceTask>
+    <serviceTask id="t4" name="Ensamblar matriz de rigidez K&#10;y vector de fuentes f(t)&#10;[FEM - ElementTetP1]">
+      <incoming>f04</incoming>
+      <outgoing>f05</outgoing>
+    </serviceTask>
+    <serviceTask id="t6" name="Resolver sistema K·phi = f&#10;para cada instante del&#10;ciclo cardiaco [MINRES]">
+      <incoming>f06</incoming>
+      <outgoing>f07</outgoing>
+    </serviceTask>
+    <serviceTask id="t8" name="Calcular distribucion de&#10;potenciales en la superficie&#10;del torso PHI(x,t)">
+      <incoming>f08</incoming>
+      <outgoing>f09</outgoing>
+    </serviceTask>
+    <serviceTask id="t9" name="Extraer senales en electrodos&#10;y calcular mapa de potenciales">
+      <incoming>f09</incoming>
+      <outgoing>f10</outgoing>
+    </serviceTask>
+    <serviceTask id="t10" name="Visualizar resultados&#10;Senales ECG + Mapa de potenciales">
+      <incoming>f10</incoming>
+      <outgoing>f11</outgoing>
+    </serviceTask>
+    <exclusiveGateway id="gw1" name="Malla valida?">
+      <incoming>f02</incoming>
+      <outgoing>f_no</outgoing>
+      <outgoing>f_si</outgoing>
+    </exclusiveGateway>
+    <userTask id="t1" name="Cargar modelo anatomico&#10;del torso">
+      <incoming>f01</incoming>
+      <outgoing>f02</outgoing>
+    </userTask>
+    <sequenceFlow id="f01" sourceRef="start" targetRef="t1" />
+    <sequenceFlow id="f_no" name="No" sourceRef="gw1" targetRef="end_err" />
+    <sequenceFlow id="f11" sourceRef="t10" targetRef="end_ok" />
+    <sequenceFlow id="f03" sourceRef="t2" targetRef="t3" />
+    <sequenceFlow id="f04" sourceRef="t3" targetRef="t4" />
+    <sequenceFlow id="f05" sourceRef="t4" targetRef="t5" />
+    <sequenceFlow id="f06" sourceRef="t5" targetRef="t6" />
+    <sequenceFlow id="f07" sourceRef="t6" targetRef="t7" />
+    <sequenceFlow id="f08" sourceRef="t7" targetRef="t8" />
+    <sequenceFlow id="f_si" name="Si" sourceRef="gw1" targetRef="t2" />
+    <sequenceFlow id="f09" sourceRef="t8" targetRef="t9" />
+    <sequenceFlow id="f10" sourceRef="t9" targetRef="t10" />
+    <sequenceFlow id="f02" sourceRef="t1" targetRef="gw1" />
+  </process>
+  <bpmndi:BPMNDiagram id="diag1">
+    <bpmndi:BPMNPlane id="plane1" bpmnElement="collab1">
+      <bpmndi:BPMNShape id="sh_pool" bpmnElement="pool1" isHorizontal="true">
+        <dc:Bounds x="160" y="60" width="1860" height="700" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="sh_ls" bpmnElement="l_sys" isHorizontal="true">
+        <dc:Bounds x="190" y="280" width="1830" height="480" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="sh_lu" bpmnElement="l_user" isHorizontal="true">
+        <dc:Bounds x="190" y="60" width="1830" height="220" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="sh_start" bpmnElement="start">
+        <dc:Bounds x="252" y="152" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="257" y="195" width="26" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="sh_end_err" bpmnElement="end_err">
+        <dc:Bounds x="557" y="430" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="538" y="473" width="75" height="40" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="sh_end_ok" bpmnElement="end_ok">
+        <dc:Bounds x="1862" y="465" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1872" y="508" width="16" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="sh_t3" bpmnElement="t3">
+        <dc:Bounds x="740" y="130" width="160" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="sh_t5" bpmnElement="t5">
+        <dc:Bounds x="1140" y="130" width="160" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="sh_t7" bpmnElement="t7">
+        <dc:Bounds x="1440" y="130" width="160" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="sh_t2" bpmnElement="t2">
+        <dc:Bounds x="660" y="300" width="180" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="sh_t4" bpmnElement="t4">
+        <dc:Bounds x="900" y="300" width="180" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="sh_t6" bpmnElement="t6">
+        <dc:Bounds x="1140" y="300" width="180" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="sh_t8" bpmnElement="t8">
+        <dc:Bounds x="1380" y="300" width="180" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="sh_t9" bpmnElement="t9">
+        <dc:Bounds x="1620" y="300" width="180" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="sh_t10" bpmnElement="t10">
+        <dc:Bounds x="1620" y="440" width="180" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="sh_gw1" bpmnElement="gw1" isMarkerVisible="true">
+        <dc:Bounds x="555" y="315" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="547" y="291" width="65" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="sh_t1" bpmnElement="t1">
+        <dc:Bounds x="340" y="140" width="160" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="sh_ann2" bpmnElement="ann2">
+        <dc:Bounds x="660" y="430" width="180" height="70" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="sh_ann3" bpmnElement="ann3">
+        <dc:Bounds x="900" y="430" width="180" height="70" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="sh_ann4" bpmnElement="ann4">
+        <dc:Bounds x="1140" y="430" width="180" height="70" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="sh_ann5" bpmnElement="ann5">
+        <dc:Bounds x="1620" y="560" width="180" height="70" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="e01" bpmnElement="f01">
+        <di:waypoint x="288" y="170" />
+        <di:waypoint x="314" y="170" />
+        <di:waypoint x="314" y="180" />
+        <di:waypoint x="340" y="180" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="e02" bpmnElement="f02">
+        <di:waypoint x="420" y="220" />
+        <di:waypoint x="420" y="340" />
+        <di:waypoint x="555" y="340" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="e_no" bpmnElement="f_no">
+        <di:waypoint x="580" y="365" />
+        <di:waypoint x="580" y="430" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="586" y="390" width="15" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="e_si" bpmnElement="f_si">
+        <di:waypoint x="605" y="340" />
+        <di:waypoint x="660" y="340" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="626" y="322" width="11" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="e03" bpmnElement="f03">
+        <di:waypoint x="820" y="300" />
+        <di:waypoint x="820" y="210" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="e04" bpmnElement="f04">
+        <di:waypoint x="820" y="210" />
+        <di:waypoint x="990" y="300" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="e05" bpmnElement="f05">
+        <di:waypoint x="1080" y="300" />
+        <di:waypoint x="1080" y="210" />
+        <di:waypoint x="1220" y="210" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="e06" bpmnElement="f06">
+        <di:waypoint x="1220" y="210" />
+        <di:waypoint x="1230" y="300" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="e07" bpmnElement="f07">
+        <di:waypoint x="1320" y="300" />
+        <di:waypoint x="1320" y="210" />
+        <di:waypoint x="1520" y="210" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="e08" bpmnElement="f08">
+        <di:waypoint x="1520" y="210" />
+        <di:waypoint x="1470" y="300" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="e09" bpmnElement="f09">
+        <di:waypoint x="1560" y="340" />
+        <di:waypoint x="1620" y="340" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="e10" bpmnElement="f10">
+        <di:waypoint x="1710" y="380" />
+        <di:waypoint x="1710" y="440" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="e11" bpmnElement="f11">
+        <di:waypoint x="1800" y="480" />
+        <di:waypoint x="1862" y="483" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="ea2" bpmnElement="as2">
+        <di:waypoint x="750" y="430" />
+        <di:waypoint x="750" y="380" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="ea3" bpmnElement="as3">
+        <di:waypoint x="990" y="430" />
+        <di:waypoint x="990" y="380" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="ea4" bpmnElement="as4">
+        <di:waypoint x="1230" y="430" />
+        <di:waypoint x="1230" y="380" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="ea5" bpmnElement="as5">
+        <di:waypoint x="1710" y="560" />
+        <di:waypoint x="1710" y="520" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="ea1" bpmnElement="as1">
+        <di:waypoint x="420" y="125" />
+        <di:waypoint x="420" y="140" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNShape id="sh_ann1" bpmnElement="ann1">
+        <dc:Bounds x="340" y="70" width="160" height="55" />
+      </bpmndi:BPMNShape>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</definitions>

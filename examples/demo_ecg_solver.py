@@ -24,54 +24,55 @@ import matplotlib.pyplot as plt
 # Agregar src al path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
-from src.solucionador_ecg import ECGSolver as SolucionadorECG
-from src.solucionador_ecg import plot_electrodes_on_torso
+from src.core.ecg_solver import ECGSolver as SolucionadorECG
+from src.core.ecg_solver import plot_electrodes_on_torso
 
 # Alias para compatibilidad con el código del demo
 ECGSolver = SolucionadorECG
 
 
-def plot_ecg_leads(leads, times, output_file="ecg_12_leads.png"):
+def plot_ecg_leads(leads, times, output_file="output/ecg_12_leads.png"):
     """
-    Grafica las 12 derivaciones del ECG en formato clínico estándar.
+    Grafica las derivaciones ECG disponibles (V1–V6 o las que haya).
     """
-    layout = [
-        ["I",   "aVR", "V1", "V4"],
-        ["II",  "aVL", "V2", "V5"],
-        ["III", "aVF", "V3", "V6"],
-    ]
-    
-    fig, axes = plt.subplots(3, 4, figsize=(16, 8))
-    fig.suptitle("ECG - 12 Derivaciones (Problema Directo FEM)",
-                 fontsize=14, fontweight="bold")
-    
-    t_ms = times * 1000  # Convertir a ms
-    
-    for row, row_names in enumerate(layout):
-        for col, name in enumerate(row_names):
-            ax = axes[row][col]
-            signal = leads[name] * 1000  # Convertir a mV
-            
-            ax.plot(t_ms, signal, color="#1a5276", linewidth=1.8)
-            ax.axhline(0, color="gray", linewidth=0.5, linestyle="--")
-            ax.set_title(name, fontsize=11, fontweight="bold")
-            ax.set_xlabel("t (ms)", fontsize=8)
-            ax.set_ylabel("mV", fontsize=8)
-            ax.tick_params(labelsize=7)
-            ax.grid(True, linestyle="--", alpha=0.35)
-            
-            # Marcar pico máximo
-            idx_max = np.argmax(np.abs(signal))
-            ax.plot(t_ms[idx_max], signal[idx_max], "ro", markersize=4)
-    
+    names = list(leads.keys())
+    n = len(names)
+    cols = min(n, 3)
+    rows = (n + cols - 1) // cols
+
+    fig, axes = plt.subplots(rows, cols, figsize=(cols * 4, rows * 2.5))
+    fig.suptitle("Derivaciones ECG (Problema Directo FEM)",
+                 fontsize=13, fontweight="bold")
+
+    axes_flat = np.array(axes).flatten() if n > 1 else [axes]
+    t_ms = times * 1000
+
+    for i, name in enumerate(names):
+        ax = axes_flat[i]
+        signal = leads[name] * 1000  # mV
+        ax.plot(t_ms, signal, color="#1a5276", linewidth=1.8)
+        ax.axhline(0, color="gray", linewidth=0.5, linestyle="--")
+        ax.set_title(name, fontsize=11, fontweight="bold")
+        ax.set_xlabel("t (ms)", fontsize=8)
+        ax.set_ylabel("mV", fontsize=8)
+        ax.tick_params(labelsize=7)
+        ax.grid(True, linestyle="--", alpha=0.35)
+        idx_max = np.argmax(np.abs(signal))
+        ax.plot(t_ms[idx_max], signal[idx_max], "ro", markersize=4)
+
+    # Ocultar ejes sobrantes
+    for j in range(n, len(axes_flat)):
+        axes_flat[j].set_visible(False)
+
     plt.tight_layout()
+    import os; os.makedirs(os.path.dirname(output_file) or ".", exist_ok=True)
     plt.savefig(output_file, dpi=150, bbox_inches="tight")
     print(f"  Figura guardada: {output_file}")
     plt.show()
 
 
 def plot_potential_map(mesh, surface_nodes, PHI, times, instant_idx=4,
-                       output_file="potential_map.png"):
+                       output_file="output/potential_map.png"):
     """
     Muestra el mapa de potenciales en la superficie del torso.
     """
@@ -118,6 +119,7 @@ def plot_potential_map(mesh, surface_nodes, PHI, times, instant_idx=4,
     ax2.grid(True, linestyle="--", alpha=0.3)
     
     plt.tight_layout()
+    import os; os.makedirs(os.path.dirname(output_file) or ".", exist_ok=True)
     plt.savefig(output_file, dpi=150, bbox_inches="tight")
     print(f"  Figura guardada: {output_file}")
     plt.show()
@@ -201,12 +203,12 @@ def main():
     # Electrodos sobre el torso 3D + mapa de potenciales
     plot_electrodes_on_torso(mesh, mio, electrode_nodes, surface_nodes,
                              PHI=PHI, instant_idx=4,
-                             output_file="electrodos_torso_demo.png")
+                             output_file="output/electrodos_torso_demo.png")
 
-    plot_ecg_leads(leads, times, "ecg_12_leads_demo.png")
+    plot_ecg_leads(leads, times, "output/ecg_12_leads_demo.png")
     
     plot_potential_map(mesh, surface_nodes, PHI, times, 
-                      instant_idx=4, output_file="potential_map_demo.png")
+                      instant_idx=4, output_file="output/potential_map_demo.png")
     
     print("\n[6/6] Demostración completada!")
     print("\nArchivos generados:")

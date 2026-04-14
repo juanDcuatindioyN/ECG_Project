@@ -2,12 +2,6 @@
 """
 Módulo principal para procesamiento VTK y resolución de Poisson
 
-Este módulo contiene las funciones principales para:
-- Carga y procesamiento de archivos VTK
-- Extracción de superficies de mallas tetraédricas
-- Resolución de ecuaciones de Poisson con fuentes puntuales
-- Visualización 3D de resultados
-
 Funciones principales:
     load_mesh_skfem: Carga mallas VTK usando scikit-fem
     extract_surface_tris: Extrae triángulos de superficie
@@ -15,6 +9,7 @@ Funciones principales:
     plot_surface: Crea visualizaciones 3D
 """
 
+import logging
 import numpy as np
 import meshio
 import matplotlib.pyplot as plt
@@ -32,40 +27,47 @@ from skfem.assembly import asm
 from skfem.utils import solve, enforce
 from skfem.helpers import dot, grad
 
+logger = logging.getLogger(__name__)
+
 # Configuración por defecto
 DEFAULT_VTK = "Sphere.vtk"
-DEFAULT_MODE = "poisson"            
-DEFAULT_Z0, DEFAULT_Z1 = -0.4, 0.4  # tapas (modo sigma)
+DEFAULT_MODE = "poisson"
+DEFAULT_Z0, DEFAULT_Z1 = -0.4, 0.4
 
-# Para modo Poisson:
 DEFAULT_SOURCES = np.array([[0.5, -0.4, 0.1]], dtype=float)
 DEFAULT_CHARGES = np.array([1.0], dtype=float)
 
 
 def load_mesh_skfem(vtk_path: str):
     """
-    Carga una malla VTK y la convierte a formato scikit-fem.
-    
+    Carga una malla VTK/MSH y la convierte a formato scikit-fem.
+
     Args:
-        vtk_path (str): Ruta al archivo VTK
-        
+        vtk_path: Ruta al archivo de malla.
+
     Returns:
-        tuple: (mesh, mio) donde mesh es la malla scikit-fem y mio es el objeto meshio
-        
+        Tupla ``(mesh, mio)`` donde ``mesh`` es la malla scikit-fem
+        y ``mio`` es el objeto meshio original.
+
     Raises:
-        RuntimeError: Si el VTK no contiene celdas tetraédricas
+        FileNotFoundError: Si el archivo no existe.
+        RuntimeError: Si la malla no contiene celdas tetraédricas.
     """
+    import os
+    if not os.path.exists(vtk_path):
+        raise FileNotFoundError(f"Archivo de malla no encontrado: {vtk_path}")
+
     mio = meshio.read(vtk_path)
     P = np.asarray(mio.points, dtype=float).T
-    
+
     if "tetra" in mio.cells_dict:
         T = np.asarray(mio.cells_dict["tetra"], dtype=int).T
     elif "tetra10" in mio.cells_dict:
         t10 = np.asarray(mio.cells_dict["tetra10"], dtype=int)
         T = t10[:, [0, 1, 2, 3]].T
     else:
-        raise RuntimeError("El VTK no contiene celdas tetraédricas.")
-    
+        raise RuntimeError("El archivo no contiene celdas tetraédricas.")
+
     try:
         from skfem import MeshTet
         try:
@@ -78,7 +80,9 @@ def load_mesh_skfem(vtk_path: str):
             mesh = MeshTet1.from_meshio(mio)
         except Exception:
             mesh = MeshTet1(P, T)
-    
+
+    logger.info("Malla cargada: %d nodos, %d elementos — %s",
+                mesh.p.shape[1], mesh.t.shape[1], vtk_path)
     return mesh, mio
 
 
@@ -152,37 +156,49 @@ def _project_inside(mesh, s, max_iter=25):
 def solve_poisson_point(mesh, sources, charges):
     """
     Resuelve la ecuación de Poisson con fuentes puntuales.
-    
+
     Args:
-        mesh: Malla scikit-fem
-        sources: Array de coordenadas de fuentes (N x 3)
-        charges: Array de cargas para cada fuente (N,)
-        
+        mesh: Malla scikit-fem.
+        sources: Array de coordenadas de fuentes, shape (N, 3).
+        charges: Array de cargas para cada fuente, shape (N,).
+
     Returns:
-        tuple: (basis, V, used_sources) donde:
-            - basis: Base de elementos finitos
-            - V: Solución del potencial
-            - used_sources: Fuentes proyectadas al interior
+        Tupla ``(basis, V, used_sources)`` donde:
+        - ``basis``: Base de elementos finitos.
+        - ``V``: Solución del potencial, shape (N_nodos,).
+        - ``used_sources``: Fuentes proyectadas al interior del dominio.
+
+    Raises:
+        ValueError: Si ``sources`` y ``charges`` tienen longitudes distintas.
     """
+    sources = np.asarray(sources, dtype=float)
+    charges = np.asarray(charges, dtype=float)
+
+    if len(sources) != len(charges):
+        raise ValueError(
+            f"sources ({len(sources)}) y charges ({len(charges)}) deben tener la misma longitud."
+        )
+
     basis = Basis(mesh, ElementTetP1())
     A = asm(laplace, basis)
     b = np.zeros(basis.N)
     used = []
-    c = mesh.p.mean(axis=1)  # centroide
-    
-    for s, q in zip(np.asarray(sources, float), np.asarray(charges, float)):
+    c = mesh.p.mean(axis=1)
+
+    for s, q in zip(sources, charges):
         s_in = _project_inside(mesh, s)
         if not _is_inside(mesh, s_in):
-            s_in = c  # usar centroide si la proyección falla
+            logger.warning("Fuente en %s no pudo proyectarse al interior; usando centroide.", s)
+            s_in = c
         b += q * basis.point_source(s_in)
         used.append(s_in)
-    
+
     D = basis.get_dofs()
-    # Aplicar condiciones de frontera Dirichlet y resolver
     xdir = np.zeros(basis.N)
     A_bc, b_bc = enforce(A, b, D=D, x=xdir)
     V = solve(A_bc, b_bc)
-    
+
+    logger.debug("Poisson resuelto: %d fuentes, max|V|=%.4e", len(used), np.abs(V).max())
     return basis, V, np.vstack(used)
 
 
@@ -208,9 +224,9 @@ def plot_surface(mesh, tris, V, sources=None, title=None, figsize=(8, 6), mio=No
     # Si tenemos mio (modelo generado), usar visualización completa
     if mio is not None:
         try:
-            from .visualization.visor_mallas_3d import crear_figura_3d_con_electrodos
+            from ..visualization.viewer3d import crear_figura_3d_con_electrodos
             # Detectar si tiene pulmones
-            from .visualization.visor_mallas_3d import extraer_etiquetas_materiales
+            from ..visualization.viewer3d import extraer_etiquetas_materiales
             etiquetas = extraer_etiquetas_materiales(mio)
             incluir_pulmones = False
             if etiquetas is not None:
@@ -333,3 +349,32 @@ def _sigma_from_vtk(mio, n_elems):
         pass
     
     return sigma
+
+
+
+
+
+def nodo_mas_cercano(mesh, posicion):
+    """
+    Retorna el índice del nodo más cercano a la posición dada.
+    """
+    distancias = np.linalg.norm(mesh.p.T - posicion, axis=1)
+    return int(np.argmin(distancias))
+
+def nodo_mas_cercano_en_superficie(mesh, nodos_sup, posicion, used_nodes=None):
+    """
+    Devuelve el índice del nodo en nodos_sup más cercano a posicion.
+    Si used_nodes es un set, evita devolver nodos ya usados (elige siguiente más cercano).
+    """
+    nodos_sup = np.asarray(nodos_sup, dtype=int)
+    if nodos_sup.size == 0:
+        return nodo_mas_cercano(mesh, posicion)
+    coords = mesh.p[:, nodos_sup].T  # shape (M,3)
+    distancias = np.linalg.norm(coords - posicion, axis=1)
+    order = np.argsort(distancias)
+    for idx in order:
+        candidate = int(nodos_sup[idx])
+        if used_nodes is None or candidate not in used_nodes:
+            return candidate
+    # fallback: devolver el más cercano aunque esté usado
+    return int(nodos_sup[order[0]])

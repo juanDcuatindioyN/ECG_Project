@@ -1,132 +1,71 @@
-#  Proyecto ECG - Simulador de ECG con FEM
+# Proyecto ECG — Simulador del Problema Directo del ECG con FEM
 
-Simulador completo del problema directo del electrocardiograma (ECG) usando el método de elementos finitos (FEM). Interfaz gráfica con generador automático de modelos anatómicos.
+Simulador del problema directo del electrocardiograma usando el método de elementos finitos (FEM). Incluye interfaz gráfica con flujo guiado de 5 pasos y generador automático de modelos anatómicos.
 
+## Requisitos
 
-## Requisito: Python 3.13
-
-Las dependencias (numpy, scipy, scikit-fem) están compiladas para **Python 3.13**.
-El venv incluido usa Python 3.14 que es incompatible — usa `py -3.13` directamente.
-
-## Inicio Rapido
+- Python 3.13
+- Dependencias: `pip install -r requirements.txt`
 
 ```bash
-# Verificar Python 3.13 disponible
-py -3.13 --version
-
-# Instalar dependencias en Python 3.13
 py -3.13 -m pip install -r requirements.txt
-
-# Iniciar aplicación
 py -3.13 main.py
+```
 
-# Ejecutar demo del solver ECG completo (desde la raíz del proyecto)
+## Estructura
+
+```
+ECG_Project/
+├── main.py                          # Punto de entrada
+├── requirements.txt
+├── data/                            # Mallas de entrada (.vtk, .msh)
+├── output/                          # Resultados generados (imágenes, CSV)
+├── examples/
+│   └── demo_ecg_solver.py           # Demo del pipeline completo
+├── tests/
+│   ├── test_core.py
+│   ├── test_gui.py
+│   └── run_all_tests.py
+└── src/
+    ├── app.py                       # Interfaz gráfica (flujo de 5 pasos)
+    ├── core/
+    │   ├── mesh_loader.py           # Carga de mallas + resolución de Poisson
+    │   └── ecg_solver.py            # Pipeline FEM completo
+    ├── generation/
+    │   └── mesh_generator.py        # Generador de modelos anatómicos (Gmsh)
+    └── visualization/
+        └── viewer3d.py              # Visualización 3D con Poly3DCollection
+```
+
+## Flujo de uso (GUI)
+
+1. **Cargar / Generar malla** — soporta VTK, MSH, STL, OBJ, PLY, OFF
+2. **Configurar dipolo** — posición del dipolo cardíaco
+3. **Ubicar electrodos** — coordenadas V1–V6
+4. **Ejecutar simulación** — pipeline FEM de 5 pasos
+5. **Ver resultados** — señales ECG y mapa de potenciales
+
+## API programática
+
+```python
+from src.core.ecg_solver import ECGSolver
+
+solver = ECGSolver('data/ecg_torso_v2_con_pulmones.msh')
+results = solver.run_full_pipeline()
+leads = results['ecg_data']['leads']
+```
+
+## Tests
+
+```bash
+py -3.13 -m tests.run_all_tests
+```
+
+## Demo
+
+```bash
 py -3.13 -m examples.demo_ecg_solver
 ```
 
-## Crear entorno virtual con Python 3.13
-
-```bash
-# Crear venv con Python 3.13 (no 3.14)
-py -3.13 -m venv venv313
-
-# Activar
-.\venv313\Scripts\Activate.ps1
-
-# Instalar dependencias
-pip install -r requirements.txt
-```
-
-##  Estructura del Proyecto
-
-```
-ECG_Project/
-├── src/                                      # Código fuente
-│   ├── gui/                                  # Componentes de interfaz
-│   ├── utils/                                # Utilidades
-│   ├── visualization/                        # Visualización 3D
-│   ├── interfaz_grafica_legacy.py           # GUI principal
-│   ├── nucleo_poisson.py                    # Núcleo de Poisson
-│   ├── solucionador_ecg.py                  # Solver ECG completo
-│   └── generador_modelos_anatomicos.py      # Generador de modelos
-├── docs/                                     # Documentación
-├── examples/                                 # Ejemplos
-├── tests/                                    # Tests
-├── data/                                     # Archivos de malla
-├── main.py                                   # Punto de entrada
-└── requirements.txt                          # Dependencias
-```
-
-##  Formatos Soportados
-
-VTK, Gmsh (.msh), STL, OBJ, PLY, OFF y más formatos gracias a **meshio**. Ver [docs/FORMATOS_SOPORTADOS.txt](docs/FORMATOS_SOPORTADOS.txt).
-
-##  Estructura del Proyecto
-
-```
-ECG_Project/
-├── src/                                      # Código fuente
-│   ├── gui/                                  # Componentes de interfaz
-│   ├── utils/                                # Utilidades
-│   ├── visualization/                        # Visualización 3D
-│   ├── interfaz_grafica_legacy.py           # GUI principal
-│   ├── nucleo_poisson.py                    # Núcleo de Poisson
-│   ├── solucionador_ecg.py                  # Solver ECG completo
-│   └── generador_modelos_anatomicos.py      # Generador de modelos
-├── docs/                                     # Documentación
-├── examples/                                 # Ejemplos
-├── tests/                                    # Tests
-├── data/                                     # Archivos de malla
-├── main.py                                   # Punto de entrada
-└── requirements.txt                          # Dependencias
-```
-
-## Caracteristicas
-
-- Interfaz gráfica con Tkinter
-- Soporte multi-formato de mallas
-- Generador automático de modelos anatómicos (torso, corazón, pulmones)
-- Resolución de Poisson con fuentes puntuales
-- Visualización 3D integrada
-- Solver ECG completo con FEM (5 pasos)
-- 12 derivaciones ECG estándar
-
-##  Uso
-
-### Interfaz Gráfica
-```bash
-python main.py
-```
-
-### Generar Modelo Automático
-1. Clic en " Generar Modelo Automático"
-2. Seleccionar "Con pulmones" o "Sin pulmones"
-3. Clic en " Generar Malla"
-
-### API Programática
-```python
-from src import SolucionadorECG
-
-solver = SolucionadorECG('data/ecg_torso_v2_con_pulmones.msh')
-resultados = solver.ejecutar_pipeline_completo()
-derivaciones = resultados['ecg_data']['leads']
-```
-
-## Documentacion
-
-- [QUICK_START.md](docs/QUICK_START.md) - Guía de inicio rápido
-- [ECG_SOLVER_GUIDE.md](docs/ECG_SOLVER_GUIDE.md) - Guía técnica del solver
-- [GENERADOR_AUTOMATICO.md](docs/GENERADOR_AUTOMATICO.md) - Guía del generador
-
-## Dependencias
-
-- numpy >= 1.19.0
-- scipy >= 1.5.0
-- matplotlib >= 3.3.0
-- scikit-fem >= 3.0.0
-- meshio >= 4.0.0
-
 ---
-
-**Versión**: 3.0.0  
-**Estado**:  Funcional
+**Versión**: 3.0.0 | **Python**: 3.13

@@ -1,109 +1,35 @@
 # -*- coding: utf-8 -*-
 """
-Proyecto ECG - Solucionador de Malla VTK con Poisson
-====================================================
+Proyecto ECG — Simulador del problema directo del ECG con FEM
+=============================================================
 
-Módulos principales:
-    interfaz_grafica_legacy: Interfaz gráfica de usuario (legacy)
-    aplicacion_principal: Aplicación GUI modular (nueva)
-    nucleo_poisson: Funciones principales de procesamiento VTK y Poisson
-    solucionador_ecg: Pipeline completo del problema directo de ECG
-    generador_modelos_anatomicos: Generador automático de modelos
-    
-Submódulos:
-    gui: Componentes de interfaz gráfica
-    utils: Utilidades (análisis, formateo)
-    visualization: Visualización 3D
+Estructura:
+    src/app.py                        — Interfaz gráfica (flujo de 5 pasos)
+    src/core/mesh_loader.py           — Carga de mallas y resolución de Poisson
+    src/core/ecg_solver.py            — Pipeline FEM completo
+    src/generation/mesh_generator.py  — Generador de modelos anatómicos (Gmsh)
+    src/visualization/viewer3d.py     — Visualización 3D
 """
 
+import logging
+
 __version__ = "3.0.0"
-__author__ = "Proyecto ECG"
-__description__ = "Solucionador interactivo de Poisson y simulador de ECG para mallas VTK"
+__description__ = "Simulador interactivo del problema directo del ECG con FEM"
 
-# Importaciones principales - Modo básico (Poisson simple)
-from .nucleo_poisson import (
-    load_mesh_skfem as cargar_malla_skfem,
-    extract_surface_tris as extraer_triangulos_superficie,
-    solve_poisson_point as resolver_poisson_punto,
-    plot_surface as graficar_superficie
-)
+logging.getLogger(__name__).addHandler(logging.NullHandler())
 
-# Importaciones - Modo avanzado (ECG completo)
-from .solucionador_ecg import (
-    ECGSolver as SolucionadorECG,
-    load_mesh_with_conductivities,
-    assemble_stiffness_matrix,
-    build_source_matrix,
-    solve_ecg_system,
-    postprocess_ecg,
-    plot_electrodes_on_torso,
-    DEFAULT_CONDUCTIVITIES,
-    DEFAULT_DIPOLE_POS,
-    DEFAULT_DIPOLE_TABLE,
-    DEFAULT_ELECTRODES
-)
+from .app import ECGAppAuto
+from .core.mesh_loader import load_mesh_skfem, solve_poisson_point
+from .core.ecg_solver import ECGSolver, DEFAULT_CONDUCTIVITIES, DEFAULT_DIPOLE_POS
+from .generation.mesh_generator import generate_mesh, HAS_GMSH
 
-# Generador de modelos
-from .generador_modelos_anatomicos import (
-    generate_mesh as generar_malla,
-    create_geometry as crear_geometria,
-    get_preview_data as obtener_datos_vista_previa,
-    HAS_GMSH
-)
-
-# Interfaz gráfica (legacy - mantener compatibilidad)
-from .interfaz_grafica_legacy import ECGAppAuto
-
-# Aplicación principal (nueva)
-try:
-    from .aplicacion_principal import ECGApp as AplicacionECG
-except ImportError:
-    AplicacionECG = None
+# Alias público principal
+ECGApp = ECGAppAuto
 
 __all__ = [
-    # GUI
-    'ECGApp',
-    'ECGAppAuto',
-    'AplicacionECG',
-    # Core básico (nombres originales para compatibilidad)
-    'load_mesh_skfem',
-    'extract_surface_tris',
-    'solve_poisson_point',
-    'plot_surface',
-    # Core básico (nombres en español)
-    'cargar_malla_skfem',
-    'extraer_triangulos_superficie',
-    'resolver_poisson_punto',
-    'graficar_superficie',
-    # ECG avanzado
-    'ECGSolver',
-    'SolucionadorECG',
-    'load_mesh_with_conductivities',
-    'assemble_stiffness_matrix',
-    'build_source_matrix',
-    'solve_ecg_system',
-    'postprocess_ecg',
-    'plot_electrodes_on_torso',
-    # Generador
-    'generate_mesh',
-    'generar_malla',
-    'crear_geometria',
-    'obtener_datos_vista_previa',
-    'HAS_GMSH',
-    # Constantes
-    'DEFAULT_CONDUCTIVITIES',
-    'DEFAULT_DIPOLE_POS',
-    'DEFAULT_DIPOLE_TABLE',
-    'DEFAULT_ELECTRODES'
+    "ECGApp", "ECGAppAuto",
+    "ECGSolver",
+    "load_mesh_skfem", "solve_poisson_point",
+    "generate_mesh", "HAS_GMSH",
+    "DEFAULT_CONDUCTIVITIES", "DEFAULT_DIPOLE_POS",
 ]
-
-# Alias para compatibilidad con código existente
-ECGApp = ECGAppAuto
-load_mesh_skfem = cargar_malla_skfem
-extract_surface_tris = extraer_triangulos_superficie
-solve_poisson_point = resolver_poisson_punto
-plot_surface = graficar_superficie
-ECGSolver = SolucionadorECG
-generate_mesh = generar_malla
-create_geometry = crear_geometria
-get_preview_data = obtener_datos_vista_previa
