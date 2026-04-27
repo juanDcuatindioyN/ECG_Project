@@ -649,12 +649,11 @@ def postprocess_ecg(mesh, surface_nodes, PHI, electrode_positions=None):
 
 
 def plot_electrodes_on_torso(mesh, mio, electrode_nodes, surface_nodes,
-                              PHI=None, instant_idx=4,
-                              output_file="output/electrodos_torso.png"):
+                              PHI=None, instant_idx=4):
     """Alias — implementacion en src/visualization/viewer3d.py."""
     from ..visualization.viewer3d import plot_electrodes_on_torso as _plot
     return _plot(mesh, mio, electrode_nodes, surface_nodes,
-                 PHI=PHI, instant_idx=instant_idx, output_file=output_file)
+                 PHI=PHI, instant_idx=instant_idx)
 
 
 # =============================================================

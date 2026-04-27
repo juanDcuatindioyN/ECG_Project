@@ -34,24 +34,25 @@ C_PRI = "#0d6efd"
 C_SUC = "#198754"
 
 
-def _output_path(name: str, subfolder: str = "") -> str:
-    """Ruta en output/<subfolder>/ con timestamp para evitar sobreescrituras.
-    Ejemplo: output/ecg/ecg_senales_20260414_153022.png
-    """
+def _save_btn(toolbar, fig, default_filename):
+    """Boton guardar integrado en el toolbar: abre dialogo para elegir destino."""
+    import tkinter.filedialog as fd
     from datetime import datetime
-    folder = os.path.join("output", subfolder) if subfolder else "output"
-    os.makedirs(folder, exist_ok=True)
-    base, ext = os.path.splitext(name)
-    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-    return os.path.join(folder, f"{base}_{ts}{ext}")
-
-
-def _save_btn(toolbar, fig, filename, subfolder=""):
-    """Boton guardar integrado en el toolbar de matplotlib."""
     def _save():
-        p = _output_path(filename, subfolder)
-        fig.savefig(p, dpi=150, bbox_inches="tight")
-        messagebox.showinfo("Guardado", f"Guardado en:\n{p}")
+        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+        base, ext = os.path.splitext(default_filename)
+        suggested = f"{base}_{ts}{ext}"
+        path = fd.asksaveasfilename(
+            title="Guardar imagen",
+            initialdir=os.path.expanduser("~"),
+            initialfile=suggested,
+            defaultextension=".png",
+            filetypes=[("PNG", "*.png"), ("JPEG", "*.jpg"), ("PDF", "*.pdf"), ("Todos", "*.*")]
+        )
+        if not path:
+            return
+        fig.savefig(path, dpi=150, bbox_inches="tight")
+        messagebox.showinfo("Guardado", f"Imagen guardada en:\n{path}")
     btn = tk.Button(toolbar, text="  Guardar imagen",
                     command=_save,
                     bg=C_SUC, fg="white",
@@ -139,7 +140,7 @@ def show_ecg_window(root, ecg_data, ecg_source_data):
 
     fig.tight_layout(pad=2.0)
     _embed_figure(win, fig,
-                  extra_widget_fn=lambda tb: _save_btn(tb, fig, "ecg_senales.png", "ecg"))
+                  extra_widget_fn=lambda tb: _save_btn(tb, fig, "ecg_senales.png"))
 
 
 # ─────────────────────────────────────────────
@@ -160,8 +161,8 @@ def show_potential_map(root, ecg_solution, ecg_mesh_data, ecg_source_data):
     phi_surf_all = PHI[sn, :]
     variacion    = phi_surf_all.max(axis=0) - phi_surf_all.min(axis=0)
     best_t       = int(np.argmax(variacion))
-    phi_sup      = phi_surf_all[:, best_t] * 1000
-    t_label      = f"t={times[best_t]*1000:.0f} ms" if times is not None else f"inst. {best_t}"
+    phi_sup      = phi_surf_all[:, 0] * 1000
+    t_label      = f"t={times[0]*1000:.0f} ms" if times is not None else "inst. 0"
 
     win = tk.Toplevel(root)
     win.title("Mapa de Potenciales")
@@ -192,15 +193,18 @@ def show_potential_map(root, ecg_solution, ecg_mesh_data, ecg_source_data):
     fig.tight_layout()
     canvas = _embed_figure(win, fig,
                            extra_widget_fn=lambda tb: _save_btn(
-                               tb, fig, "mapa_potenciales.png", "potenciales"))
+                               tb, fig, "mapa_potenciales.png"))
 
-    # Slider temporal
+    # Slider temporal + animacion
     if times is not None and len(times) > 1:
         vmax_global = float(np.abs(phi_surf_all).max()) or 1.0
         ctrl = tk.Frame(win, bg=C_BG2)
         ctrl.pack(fill=tk.X, padx=6, pady=4)
-        fase_var = tk.StringVar()
-        t_var    = tk.IntVar(value=best_t)
+        fase_var    = tk.StringVar()
+        t_var       = tk.IntVar(value=0)
+        playing     = [False]
+        anim_id     = [None]
+        speed_var   = tk.IntVar(value=120)   # ms entre frames
 
         def _update(val):
             t     = int(float(val))
@@ -215,17 +219,69 @@ def show_potential_map(root, ecg_solution, ecg_mesh_data, ecg_source_data):
             fase_var.set(f"{fase}  (t = {times[t]*1000:.0f} ms)")
             canvas.draw()
 
-        tk.Label(ctrl, text="Fase:", font=("Arial", 8, "bold"),
-                 bg=C_BG2, fg=C_TXT).pack(side=tk.LEFT, padx=4)
-        tk.Label(ctrl, textvariable=fase_var, font=("Arial", 8),
-                 bg=C_BG2, fg=C_PRI, width=30, anchor="w").pack(side=tk.LEFT, padx=2)
-        tk.Scale(ctrl, from_=0, to=len(times)-1, orient=tk.HORIZONTAL,
-                 variable=t_var, command=_update,
-                 bg=C_BG2, fg=C_TXT, length=280,
-                 label="Instante").pack(side=tk.LEFT, padx=8)
+        def _step():
+            if not playing[0]:
+                return
+            nxt = (t_var.get() + 1) % len(times)
+            t_var.set(nxt)
+            _update(nxt)
+            anim_id[0] = win.after(speed_var.get(), _step)
 
-        fase_init = CARDIAC_PHASES[best_t] if best_t < len(CARDIAC_PHASES) else ""
-        fase_var.set(f"{fase_init}  (t = {times[best_t]*1000:.0f} ms)")
+        def _toggle_play():
+            playing[0] = not playing[0]
+            if playing[0]:
+                play_btn.config(text="⏸  Pausar")
+                _step()
+            else:
+                play_btn.config(text="▶  Reproducir")
+                if anim_id[0]:
+                    win.after_cancel(anim_id[0])
+
+        def _stop():
+            playing[0] = False
+            play_btn.config(text="▶  Reproducir")
+            if anim_id[0]:
+                win.after_cancel(anim_id[0])
+            t_var.set(0)
+            _update(0)
+
+        win.protocol("WM_DELETE_WINDOW", lambda: (_stop(), win.destroy()))
+
+        # Fila 1: fase actual
+        row1 = tk.Frame(ctrl, bg=C_BG2)
+        row1.pack(fill=tk.X, pady=(2, 0))
+        tk.Label(row1, text="Fase:", font=("Arial", 8, "bold"),
+                 bg=C_BG2, fg=C_TXT).pack(side=tk.LEFT, padx=4)
+        tk.Label(row1, textvariable=fase_var, font=("Arial", 8),
+                 bg=C_BG2, fg=C_PRI, width=34, anchor="w").pack(side=tk.LEFT, padx=2)
+
+        # Fila 2: slider
+        row2 = tk.Frame(ctrl, bg=C_BG2)
+        row2.pack(fill=tk.X, pady=2)
+        tk.Label(row2, text="Instante:", font=("Arial", 8),
+                 bg=C_BG2, fg=C_TXT).pack(side=tk.LEFT, padx=4)
+        tk.Scale(row2, from_=0, to=len(times)-1, orient=tk.HORIZONTAL,
+                 variable=t_var, command=_update,
+                 bg=C_BG2, fg=C_TXT, length=320).pack(side=tk.LEFT, padx=4)
+
+        # Fila 3: controles de reproduccion
+        row3 = tk.Frame(ctrl, bg=C_BG2)
+        row3.pack(fill=tk.X, pady=(2, 4))
+        play_btn = tk.Button(row3, text="▶  Reproducir", command=_toggle_play,
+                             bg=C_PRI, fg="white", relief=tk.FLAT,
+                             font=("Arial", 9, "bold"), padx=10, pady=3, cursor="hand2")
+        play_btn.pack(side=tk.LEFT, padx=4)
+        tk.Button(row3, text="⏹  Reiniciar", command=_stop,
+                  bg="#6c757d", fg="white", relief=tk.FLAT,
+                  font=("Arial", 9, "bold"), padx=10, pady=3, cursor="hand2").pack(side=tk.LEFT, padx=4)
+        tk.Label(row3, text="Velocidad (ms/frame):", font=("Arial", 8),
+                 bg=C_BG2, fg=C_TXT).pack(side=tk.LEFT, padx=(12, 2))
+        tk.Scale(row3, from_=40, to=600, orient=tk.HORIZONTAL,
+                 variable=speed_var, bg=C_BG2, fg=C_TXT, length=140,
+                 showvalue=True).pack(side=tk.LEFT)
+
+        fase_init = CARDIAC_PHASES[0] if len(CARDIAC_PHASES) > 0 else ""
+        fase_var.set(f"{fase_init}  (t = {times[0]*1000:.0f} ms)")
 
 
 # ─────────────────────────────────────────────
@@ -320,3 +376,107 @@ def preview_electrodes(mesh, mio, dipole_pos, elec, queue):
         except Exception as e:
             queue.put(("error", f"Vista electrodos: {e}"))
     threading.Thread(target=_work, daemon=True).start()
+
+
+# ─────────────────────────────────────────────
+# Exportar resultados a VTK
+# ─────────────────────────────────────────────
+
+def export_vtk(root, ecg_mesh_data, ecg_solution, ecg_source_data):
+    """
+    Exporta la malla con los potenciales calculados a un archivo VTK ASCII legacy.
+    El archivo puede abrirse directamente en un bloc de notas.
+    """
+    import tkinter.filedialog as fd
+
+    if not ecg_mesh_data or not ecg_solution:
+        messagebox.showwarning("Sin datos", "Primero ejecuta la simulacion.")
+        return
+
+    from datetime import datetime
+    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+    default_name = f"resultado_ecg_{ts}.vtk"
+
+    path = fd.asksaveasfilename(
+        parent=root,
+        title="Guardar resultado como VTK",
+        initialdir=os.path.expanduser("~"),
+        initialfile=default_name,
+        defaultextension=".vtk",
+        filetypes=[("VTK Legacy ASCII", "*.vtk"), ("Todos", "*.*")]
+    )
+    if not path:
+        return
+
+    try:
+        mesh  = ecg_mesh_data["mesh"]
+        mio   = ecg_mesh_data["mio"]
+        PHI   = ecg_solution["PHI"]          # (N_nodos, T)
+        times = ecg_source_data.get("times") if ecg_source_data else None
+
+        points = mesh.p.T                    # (N, 3)
+        cells  = mesh.t.T                    # (E, 4)
+        N = points.shape[0]
+        E = cells.shape[0]
+        T = PHI.shape[1]
+
+        # Etiquetas de material por elemento
+        mat_labels = None
+        if hasattr(mio, "cell_data_dict"):
+            d = mio.cell_data_dict
+            if "gmsh:physical" in d and "tetra" in d["gmsh:physical"]:
+                mat_labels = d["gmsh:physical"]["tetra"].flatten().astype(int)
+
+        with open(path, "w", encoding="utf-8") as f:
+            # Cabecera
+            f.write("# vtk DataFile Version 2.0\n")
+            f.write(f"ECG Solver Result - {ts}\n")
+            f.write("ASCII\n")
+            f.write("DATASET UNSTRUCTURED_GRID\n\n")
+
+            # Puntos
+            f.write(f"POINTS {N} double\n")
+            for x, y, z in points:
+                f.write(f"{x:.10g} {y:.10g} {z:.10g}\n")
+            f.write("\n")
+
+            # Celdas (tetraedros: 4 nodos, prefijo 4)
+            f.write(f"CELLS {E} {E * 5}\n")
+            for tet in cells:
+                f.write(f"4 {tet[0]} {tet[1]} {tet[2]} {tet[3]}\n")
+            f.write("\n")
+
+            # Tipos de celda (10 = VTK_TETRA)
+            f.write(f"CELL_TYPES {E}\n")
+            for _ in range(E):
+                f.write("10\n")
+            f.write("\n")
+
+            # Datos de punto: potencial en cada instante
+            f.write(f"POINT_DATA {N}\n")
+            for t_idx in range(T):
+                if times is not None:
+                    label = f"phi_t{t_idx:02d}_{times[t_idx]*1000:.0f}ms"
+                else:
+                    label = f"phi_t{t_idx:02d}"
+                f.write(f"SCALARS {label} double 1\n")
+                f.write("LOOKUP_TABLE default\n")
+                for val in PHI[:, t_idx]:
+                    f.write(f"{val:.10g}\n")
+                f.write("\n")
+
+            # Datos de celda: material
+            if mat_labels is not None and len(mat_labels) == E:
+                f.write(f"CELL_DATA {E}\n")
+                f.write("SCALARS material int 1\n")
+                f.write("LOOKUP_TABLE default\n")
+                for val in mat_labels:
+                    f.write(f"{val}\n")
+                f.write("\n")
+
+        messagebox.showinfo("Exportado",
+                            f"Archivo VTK ASCII guardado en:\n{path}\n\n"
+                            f"Contiene {T} instantes temporales\n"
+                            f"y {N:,} nodos.")
+    except Exception as e:
+        messagebox.showerror("Error al exportar", str(e))

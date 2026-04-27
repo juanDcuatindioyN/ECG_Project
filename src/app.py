@@ -628,8 +628,7 @@ class ECGAppAuto:
                                       electrode_positions=self.manual_electrodes)
                 fig = plot_electrodes_on_torso(
                     md["mesh"], md["mio"], ecg["electrode_nodes"],
-                    md["surface_nodes"], PHI=sol["PHI"], instant_idx=4,
-                    output_file=_output_path("electrodos_torso.png", "modelos"))
+                    md["surface_nodes"], PHI=sol["PHI"], instant_idx=4)
                 self._queue.put(("sim_done", {
                     "mesh_data": md, "solution": sol,
                     "source_data": sd, "ecg": ecg, "fig": fig,
@@ -665,6 +664,10 @@ class ECGAppAuto:
         _btn(row, "Ver senales ECG", self._show_ecg_window, C["purple"]).pack(side=tk.LEFT, padx=4)
         _btn(row, "Mapa de potenciales", self._show_potential_map,
              C["warning"], fg="black").pack(side=tk.LEFT, padx=4)
+        row2 = tk.Frame(self.sec_results, bg=C["bg"])
+        row2.pack(fill=tk.X, pady=(0, 4))
+        _btn(row2, "Exportar resultado (.vtk)", self._export_vtk,
+             C["success"]).pack(side=tk.LEFT, padx=4)
         self._lock_section(self.sec_results)
 
     def _show_ecg_window(self):
@@ -677,6 +680,10 @@ class ECGAppAuto:
             return
         ui_results.show_potential_map(
             self.root, self.ecg_solution, self.ecg_mesh_data, self.ecg_source_data)
+
+    def _export_vtk(self):
+        ui_results.export_vtk(
+            self.root, self.ecg_mesh_data, self.ecg_solution, self.ecg_source_data)
 
     # ──────────────────────────────────────────
     # Generador de modelo automatico
@@ -823,12 +830,18 @@ class ECGAppAuto:
             cls = w.winfo_class()
             if cls == "Button":
                 txt = w.cget("text")
-                if any(x in txt for x in ["Confirmar", "Iniciar", "Ver sen", "Mapa"]):
-                    w.config(bg=C["primary"] if "Mapa" not in txt else C["warning"], fg="white")
-                elif any(x in txt for x in ["Posiciones", "Ver en", "Seleccionar", "Generar", "Actualizar"]):
-                    w.config(bg=C["success"] if "Seleccionar" in txt or "Generar" in txt else C["neutral"], fg="white")
+                if "Confirmar" in txt or "Iniciar" in txt:
+                    w.config(bg=C["primary"], fg="white")
                 elif "ECG" in txt:
                     w.config(bg=C["purple"], fg="white")
+                elif "Mapa" in txt:
+                    w.config(bg=C["warning"], fg="black")
+                elif "Exportar" in txt:
+                    w.config(bg=C["success"], fg="white")
+                elif "Seleccionar" in txt or "Generar" in txt:
+                    w.config(bg=C["success"], fg="white")
+                elif any(x in txt for x in ["Posiciones", "Ver en", "Actualizar"]):
+                    w.config(bg=C["neutral"], fg="white")
             elif cls == "Entry":
                 w.config(bg="white")
             elif cls == "Text":

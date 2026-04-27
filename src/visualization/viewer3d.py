@@ -404,8 +404,7 @@ def crear_figura_3d_con_electrodos(malla, mio, sources, incluir_pulmones=False):
 # ─────────────────────────────────────────────
 
 def plot_electrodes_on_torso(mesh, mio, electrode_nodes, surface_nodes,
-                              PHI=None, instant_idx=4,
-                              output_file="output/electrodos_torso.png"):
+                              PHI=None, instant_idx=4):
     """
     Figura con vista 3D del torso con electrodos y mapa 2D de potenciales.
 
@@ -416,7 +415,6 @@ def plot_electrodes_on_torso(mesh, mio, electrode_nodes, surface_nodes,
         surface_nodes: array de indices de nodos en la superficie
         PHI: Potenciales (N, T), opcional
         instant_idx: Instante a mostrar en el mapa 2D
-        output_file: Ruta del PNG de salida
 
     Returns:
         matplotlib.figure.Figure
@@ -522,6 +520,4 @@ def plot_electrodes_on_torso(mesh, mio, electrode_nodes, surface_nodes,
     ax2d.set_aspect("equal"); ax2d.grid(True, ls="--", alpha=0.3)
 
     fig.tight_layout()
-    os.makedirs(os.path.dirname(output_file) or ".", exist_ok=True)
-    fig.savefig(output_file, dpi=150, bbox_inches="tight")
     return fig
