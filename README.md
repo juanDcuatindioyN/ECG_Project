@@ -2,39 +2,45 @@
 
 Simulador del problema directo del electrocardiograma usando el método de elementos finitos (FEM). Incluye interfaz gráfica con flujo guiado de 5 pasos y generador automático de modelos anatómicos.
 
+## Inicio rápido
+
+### Opción 1 — Doble clic (recomendado)
+Haz doble clic en **`iniciar.bat`**. Detecta Python automáticamente, instala dependencias si faltan y lanza la aplicación.
+
+### Opción 2 — Consola
+```bash
+# Instalar dependencias (solo la primera vez)
+python -m pip install -r requirements.txt
+
+# Ejecutar
+python main.py
+```
+
 ## Requisitos
 
-- Python 3.13
-- Dependencias: `pip install -r requirements.txt`
-
-```bash
-py -3.13 -m pip install -r requirements.txt
-py -3.13 main.py
-```
+- Python **3.8 o superior** (3.9, 3.10, 3.11, 3.12, 3.13 — todos compatibles)
+- Las dependencias se instalan automáticamente con `iniciar.bat`
 
 ## Estructura
 
 ```
 ECG_Project/
+├── iniciar.bat                      # Lanzador con doble clic
 ├── main.py                          # Punto de entrada
 ├── requirements.txt
 ├── data/                            # Mallas de entrada (.vtk, .msh)
-├── output/                          # Resultados generados (imágenes, CSV)
 ├── examples/
-│   └── demo_ecg_solver.py           # Demo del pipeline completo
+│   └── demo_ecg_solver.py
 ├── tests/
-│   ├── test_core.py
-│   ├── test_gui.py
-│   └── run_all_tests.py
 └── src/
     ├── app.py                       # Interfaz gráfica (flujo de 5 pasos)
     ├── core/
-    │   ├── mesh_loader.py           # Carga de mallas + resolución de Poisson
-    │   └── ecg_solver.py            # Pipeline FEM completo
+    │   ├── mesh_loader.py
+    │   └── ecg_solver.py
     ├── generation/
-    │   └── mesh_generator.py        # Generador de modelos anatómicos (Gmsh)
+    │   └── mesh_generator.py
     └── visualization/
-        └── viewer3d.py              # Visualización 3D con Poly3DCollection
+        └── viewer3d.py
 ```
 
 ## Flujo de uso (GUI)
@@ -42,8 +48,12 @@ ECG_Project/
 1. **Cargar / Generar malla** — soporta VTK, MSH, STL, OBJ, PLY, OFF
 2. **Configurar dipolo** — posición del dipolo cardíaco
 3. **Ubicar electrodos** — coordenadas V1–V6
-4. **Ejecutar simulación** — pipeline FEM de 5 pasos
-5. **Ver resultados** — señales ECG y mapa de potenciales
+4. **Ejecutar simulación** — pipeline FEM completo
+5. **Ver resultados** — señales ECG, mapa de potenciales animado, exportar VTK ASCII
+
+## Exportar resultados
+
+El botón **Exportar resultado (.vtk)** genera un archivo VTK ASCII legacy que puede abrirse en el Bloc de notas o en ParaView/VisIt.
 
 ## API programática
 
@@ -55,17 +65,5 @@ results = solver.run_full_pipeline()
 leads = results['ecg_data']['leads']
 ```
 
-## Tests
-
-```bash
-py -3.13 -m tests.run_all_tests
-```
-
-## Demo
-
-```bash
-py -3.13 -m examples.demo_ecg_solver
-```
-
 ---
-**Versión**: 3.0.0 | **Python**: 3.13
+**Versión**: 3.0.0 | **Python**: 3.8+

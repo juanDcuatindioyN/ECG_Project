@@ -2,10 +2,7 @@
 # -*- coding: utf-8 -*-
 """
 Proyecto ECG - Solucionador de Malla VTK con Poisson
-===================================================
-
-Autor: Proyecto ECG
-Versión: 1.0.0
+Compatible con Python 3.8+
 """
 
 import sys
@@ -13,7 +10,13 @@ import os
 import logging
 import argparse
 
-# Configurar logging básico para la aplicación
+# Verificar version minima de Python
+if sys.version_info < (3, 8):
+    print("ERROR: Se requiere Python 3.8 o superior.")
+    print("Version actual: {}".format(sys.version))
+    sys.exit(1)
+
+# Configurar logging
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
@@ -27,71 +30,80 @@ from src import ECGAppAuto as ECGApp, __version__, __description__
 
 
 def run_gui():
-    """Ejecuta la interfaz gráfica principal"""
+    """Ejecuta la interfaz grafica principal."""
     try:
-        import tkinter as tk
-        
-        print(f"Iniciando {__description__} v{__version__}")
-        print("Formatos soportados: VTK, Gmsh (.msh), STL, OBJ, PLY, y más")
-        print("Arrastra archivos o usa el botón para cargar")
-        
-        # Crear la aplicación directamente sin crear root por separado
-        app = ECGApp(None)  # Pasamos None para que la clase cree su propia ventana
-        
+        import tkinter  # noqa: F401
+        print("Iniciando {} v{}".format(__description__, __version__))
+        print("Python {}".format(sys.version.split()[0]))
+        print("Formatos soportados: VTK, Gmsh (.msh), STL, OBJ, PLY, y mas")
+        app = ECGApp(None)
         app.root.mainloop()
-        
     except ImportError as e:
-        print(f"Error: Falta dependencia requerida: {e}")
-        print("Instala las dependencias con: pip install -r requirements.txt")
+        print("Error: Falta dependencia requerida: {}".format(e))
+        print("Instala las dependencias con: python -m pip install -r requirements.txt")
         return 1
     except Exception as e:
-        print(f"Error inesperado: {e}")
+        print("Error inesperado: {}".format(e))
         return 1
-    
     return 0
 
 
 def run_tests():
-    """Ejecuta la suite de pruebas"""
+    """Ejecuta la suite de pruebas."""
     try:
         from tests.run_all_tests import main as run_all_tests
         return run_all_tests()
     except ImportError:
         print("Error: No se pueden importar las pruebas")
-        print("Verifica que el directorio tests/ existe y contiene los archivos necesarios")
         return 1
 
 
 def run_demo():
-    """Ejecuta la demostración del solver ECG"""
+    """Ejecuta la demostracion del solver ECG."""
     try:
-        import sys
         sys.path.insert(0, 'examples')
         from examples.demo_ecg_solver import main as demo_main
         return demo_main()
     except ImportError:
-        print("Error: No se puede importar la demostración")
-        print("Ejecuta directamente: py -3.13 -m examples.demo_ecg_solver")
+        print("Error: No se puede importar la demostracion")
         return 1
     except Exception as e:
-        print(f"Error en demostración: {e}")
+        print("Error en demostracion: {}".format(e))
         return 1
+
+
+def show_info():
+    """Muestra informacion del proyecto."""
+    print("=" * 60)
+    print(__description__)
+    print("Version: {}  |  Python: {}".format(__version__, sys.version.split()[0]))
+    print("=" * 60)
+    print("\nComandos:")
+    print("  python main.py           - Ejecutar interfaz grafica")
+    print("  python main.py --test    - Ejecutar pruebas")
+    print("  python main.py --demo    - Ver demostracion")
+    print("  python main.py --info    - Mostrar esta informacion")
+    print("\nO simplemente haz doble clic en: iniciar.bat")
+    print("=" * 60)
 
 
 def main():
-    """Función principal"""
+    """Funcion principal."""
     parser = argparse.ArgumentParser(
         description=__description__,
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    
-    parser.add_argument('--version', action='version', version=f'%(prog)s {__version__}')
-    parser.add_argument('--test', action='store_true', help='Ejecutar suite de pruebas')
-    parser.add_argument('--demo', action='store_true', help='Ejecutar demostración')
-    parser.add_argument('--info', action='store_true', help='Mostrar información del proyecto')
-    
+    parser.add_argument('--version', action='version',
+                        version='%(prog)s {}'.format(__version__))
+    parser.add_argument('--test',  action='store_true',
+                        help='Ejecutar suite de pruebas')
+    parser.add_argument('--demo',  action='store_true',
+                        help='Ejecutar demostracion')
+    parser.add_argument('--info',  action='store_true',
+                        help='Mostrar informacion del proyecto')
+
     args = parser.parse_args()
-    
+
     if args.test:
         return run_tests()
     elif args.demo:
@@ -101,41 +113,6 @@ def main():
         return 0
     else:
         return run_gui()
-
-
-def show_info():
-    """Muestra información del proyecto"""
-    print("=" * 60)
-    print(f"{__description__}")
-    print(f"Versión: {__version__}")
-    print("=" * 60)
-    print("\nModos de Operación:")
-    print("  1. Modo Básico (GUI)    - Resolución de Poisson con interfaz gráfica")
-    print("  2. Modo Avanzado (API)  - Simulador completo de ECG con FEM")
-    print("\nComandos:")
-    print("  python main.py           - Ejecutar interfaz gráfica")
-    print("  python main.py --test    - Ejecutar pruebas")
-    print("  python main.py --demo    - Ver demostración")
-    print("  python main.py --info    - Mostrar esta información")
-    print("\nEjemplos de Uso:")
-    print("  Modo Básico:")
-    print("    python main.py")
-    print("    # Arrastra archivos .vtk, .msh, .stl, .obj, etc.")
-    print("    # Soporta múltiples formatos de malla")
-    print("\n  Modo Avanzado:")
-    print("    python examples/demo_ecg_solver.py")
-    print("\n  API Programática:")
-    print("    from src.ecg_solver import ECGSolver")
-    print("    solver = ECGSolver('data/ecg_torso_v2_con_pulmones.msh')")
-    print("    results = solver.run_full_pipeline()")
-    print("\nDocumentación:")
-    print("  docs/QUICK_START.md       - Guía de inicio rápido")
-    print("  docs/ECG_SOLVER_GUIDE.md  - Guía técnica completa")
-    print("  README.md                 - Descripción general")
-    print("\nArchivos de Datos:")
-    print("  data/Sphere.vtk                        - Malla simple (modo básico)")
-    print("  data/ecg_torso_v2_con_pulmones.msh     - Malla ECG completa")
-    print("=" * 60)
 
 
 if __name__ == "__main__":
