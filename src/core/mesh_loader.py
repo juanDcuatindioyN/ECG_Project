@@ -354,6 +354,90 @@ def _sigma_from_vtk(mio, n_elems):
 
 
 
+def extract_torso_surface_nodes(mio, mesh):
+    """
+    Devuelve los indices de nodos que pertenecen SOLO a la superficie
+    exterior del torso, independientemente del modelo cargado.
+
+    Estrategia en orden de prioridad:
+    1. Si hay etiquetas de material, usa las caras exteriores del material 1 (torso).
+    2. Si no hay materiales pero hay triangulos de superficie explicitos,
+       filtra los nodos que esten en la capa mas externa (percentil 85+ de radio).
+    3. Fallback geometrico puro: nodos de superficie con radio >= percentil 85
+       respecto al centroide, garantizando que sean la capa exterior.
+    """
+    from collections import Counter
+
+    X = mesh.p.T          # (N, 3)
+    centroide = X.mean(axis=0)
+    radios = np.linalg.norm(X - centroide, axis=1)
+
+    mat_labels = None
+    if hasattr(mio, "cell_data_dict"):
+        d = mio.cell_data_dict
+        if "gmsh:physical" in d and "tetra" in d["gmsh:physical"]:
+            mat_labels = d["gmsh:physical"]["tetra"].flatten().astype(int)
+
+    tets = mio.cells_dict.get("tetra")
+
+    # ── Estrategia 1: material 1 disponible ──
+    if mat_labels is not None and tets is not None and 1 in np.unique(mat_labels):
+        tets_torso = tets[mat_labels == 1]
+        cara_count = Counter()
+        for tet in tets_torso:
+            for cara in [
+                tuple(sorted([tet[0], tet[1], tet[2]])),
+                tuple(sorted([tet[0], tet[1], tet[3]])),
+                tuple(sorted([tet[0], tet[2], tet[3]])),
+                tuple(sorted([tet[1], tet[2], tet[3]])),
+            ]:
+                cara_count[cara] += 1
+        sup = np.array([list(c) for c, n in cara_count.items() if n == 1], dtype=int)
+        if len(sup) > 0:
+            candidatos = np.unique(sup.ravel())
+            # Adicionalmente filtrar por radio para excluir caras internas
+            # que puedan haber quedado (interfaz torso-corazon)
+            r_cand = radios[candidatos]
+            umbral = np.percentile(r_cand, 20)   # quitar el 20% mas interno
+            externos = candidatos[r_cand >= umbral]
+            return externos if len(externos) > 0 else candidatos
+
+    # ── Estrategia 2 y 3: sin materiales — filtro geometrico ──
+    # Obtener todos los nodos de superficie (caras que aparecen una sola vez)
+    if tets is not None:
+        cara_count = Counter()
+        for tet in tets:
+            for cara in [
+                tuple(sorted([tet[0], tet[1], tet[2]])),
+                tuple(sorted([tet[0], tet[1], tet[3]])),
+                tuple(sorted([tet[0], tet[2], tet[3]])),
+                tuple(sorted([tet[1], tet[2], tet[3]])),
+            ]:
+                cara_count[cara] += 1
+        sup = np.array([list(c) for c, n in cara_count.items() if n == 1], dtype=int)
+        if len(sup) > 0:
+            candidatos = np.unique(sup.ravel())
+        else:
+            candidatos = np.arange(len(X))
+    else:
+        tris = extract_surface_tris(mio, mesh)
+        candidatos = np.unique(tris.ravel())
+
+    # Filtro geometrico: quedarse con el 30% mas externo por radio
+    # Esto elimina nodos de organos internos expuestos
+    r_cand = radios[candidatos]
+    umbral = np.percentile(r_cand, 70)
+    externos = candidatos[r_cand >= umbral]
+
+    # Garantia: si el filtro deja muy pocos nodos, relajar el umbral
+    min_nodos = max(50, int(len(candidatos) * 0.15))
+    if len(externos) < min_nodos:
+        umbral = np.percentile(r_cand, 50)
+        externos = candidatos[r_cand >= umbral]
+
+    return externos
+
+
 def nodo_mas_cercano(mesh, posicion):
     """
     Retorna el índice del nodo más cercano a la posición dada.

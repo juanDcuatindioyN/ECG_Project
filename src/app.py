@@ -31,7 +31,7 @@ except ImportError:
     HAS_GMSH = False
 
 from .core.mesh_loader import (
-    load_mesh_skfem, extract_surface_tris,
+    load_mesh_skfem, extract_surface_tris, extract_torso_surface_nodes,
     solve_poisson_point, plot_surface,
     nodo_mas_cercano_en_superficie,
 )
@@ -327,7 +327,7 @@ class ECGAppAuto:
             try:
                 mesh, mio = load_mesh_skfem(path)
                 tris = extract_surface_tris(mio, mesh)
-                nodos_sup = np.unique(tris.flatten())
+                nodos_sup = extract_torso_surface_nodes(mio, mesh)
                 analysis = analyze_mesh_complexity(mesh)
                 src, chg = auto_detect_sources(mesh, analysis["optimal_sources"], mio=mio)
                 self._queue.put(("mesh_loaded", {
